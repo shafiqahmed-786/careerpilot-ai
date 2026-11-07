@@ -1,6 +1,17 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from email_validator import EmailNotValidError, validate_email
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.security import MAX_PASSWORD_BYTES
+
+
+def normalize_email(value: str) -> str:
+    """Validate syntax (no DNS lookup) and return the canonical lower-case address."""
+    try:
+        return validate_email(value.strip(), check_deliverability=False).normalized.lower()
+    except EmailNotValidError as exc:
+        raise ValueError("Enter a valid email address") from exc
 
 
 class TokenResponse(BaseModel):
@@ -13,10 +24,27 @@ class SignupRequest(BaseModel):
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=128)
 
+    @field_validator("email")
+    @classmethod
+    def _valid_email(cls, value: str) -> str:
+        return normalize_email(value)
+
+    @field_validator("password")
+    @classmethod
+    def _valid_password(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > MAX_PASSWORD_BYTES:
+            raise ValueError(
+                f"Password is too long: at most {MAX_PASSWORD_BYTES} bytes in UTF-8 "
+                "(emoji and non-Latin letters use several bytes each)"
+            )
+        if not value.strip():
+            raise ValueError("Password cannot be only spaces")
+        return value
+
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=1, max_length=128)
 
 
 class UserResponse(BaseModel):
@@ -133,6 +161,7 @@ class JobResponse(BaseModel):
 
 
 class DashboardResponse(BaseModel):
+    latest_job: JobResponse | None = None
     profile: ProfileResponse | None
     assessment: AssessmentResponse | None
     roadmap: RoadmapResponse | None

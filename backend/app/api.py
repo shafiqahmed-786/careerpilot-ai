@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -132,6 +133,41 @@ def _roadmap_out(roadmap: Roadmap) -> RoadmapResponse:
     )
 
 
+def _commit(db: Session) -> None:
+    """Commit, rolling the session back first if the database rejects the write."""
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def _job_out(job: AssessmentJob) -> JobResponse:
+    return JobResponse(
+        id=job.id,
+        status=job.status,
+        error=job.error,
+        assessment_id=job.assessment_id,
+        roadmap_id=job.roadmap_id,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+    )
+
+
+def _latest_job(db: Session, user_id: str) -> AssessmentJob | None:
+    return (
+        db.query(AssessmentJob)
+        .filter(AssessmentJob.user_id == user_id)
+        .order_by(AssessmentJob.created_at.desc())
+        .first()
+    )
+
+
+def _find_user_by_email(db: Session, email: str) -> User | None:
+    return db.query(User).filter(User.email == email).first()
+
+
 def _latest_assessment(db: Session, user_id: str) -> Assessment | None:
     return (
         db.query(Assessment)
@@ -152,15 +188,21 @@ def _latest_roadmap(db: Session, user_id: str) -> Roadmap | None:
 
 @router.post("/auth/signup", response_model=TokenResponse, status_code=201)
 def signup(body: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    email = body.email.strip().lower()
-    if "@" not in email or email.startswith("@") or email.endswith("@"):
-        raise HTTPException(status_code=422, detail="Enter a valid email address")
-    exists = db.query(User).filter(User.email == email).first()
-    if exists is not None:
+    # SignupRequest has already validated and lower-cased the email and checked the password length.
+    email = body.email
+    if _find_user_by_email(db, email) is not None:
         raise HTTPException(status_code=409, detail="An account with that email already exists")
     user = User(email=email, password_hash=hash_password(body.password), created_at=datetime.now(UTC))
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # Two concurrent signups can both pass the check above. The unique index decides the winner.
+        db.rollback()
+        raise HTTPException(status_code=409, detail="An account with that email already exists") from exc
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(user)
     return _token(user)
 
@@ -168,7 +210,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
 @router.post("/auth/login", response_model=TokenResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     email = body.email.strip().lower()
-    user = db.query(User).filter(User.email == email).first()
+    user = _find_user_by_email(db, email)
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     return _token(user)
@@ -217,7 +259,7 @@ def save_profile(
     profile.weekly_hours = body.weekly_hours
     profile.timeline_weeks = body.timeline_weeks
     profile.updated_at = now
-    db.commit()
+    _commit(db)
     db.refresh(profile)
     return _profile_out(profile)
 
@@ -232,27 +274,22 @@ def create_assessment(
         raise HTTPException(status_code=400, detail="Complete your career profile before requesting an assessment")
     job = AssessmentJob(user_id=user.id, status="queued", created_at=datetime.now(UTC))
     db.add(job)
-    db.commit()
+    _commit(db)
     db.refresh(job)
     try:
         job.rq_job_id = enqueue_assessment(job.id)
-        db.commit()
+        _commit(db)
     except Exception as exc:
+        db.rollback()
         job.status = "failed"
         job.error = f"Could not enqueue background job: {exc}"[:2000]
-        db.commit()
-        raise HTTPException(status_code=503, detail="The job queue is unavailable. Start Redis and the RQ worker.") from exc
+        _commit(db)
+        raise HTTPException(
+            status_code=503,
+            detail="The job queue is unavailable. Start Redis (docker compose up -d redis) and the RQ worker.",
+        ) from exc
     db.refresh(job)
-    return JobResponse(
-        id=job.id,
-        status=job.status,
-        error=job.error,
-        assessment_id=job.assessment_id,
-        roadmap_id=job.roadmap_id,
-        created_at=job.created_at,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
-    )
+    return _job_out(job)
 
 
 @router.get("/jobs/{job_id}", response_model=JobResponse)
@@ -260,16 +297,7 @@ def get_job(job_id: str, user: User = Depends(get_current_user), db: Session = D
     job = db.get(AssessmentJob, job_id)
     if job is None or job.user_id != user.id:
         raise HTTPException(status_code=404, detail="Job not found")
-    return JobResponse(
-        id=job.id,
-        status=job.status,
-        error=job.error,
-        assessment_id=job.assessment_id,
-        roadmap_id=job.roadmap_id,
-        created_at=job.created_at,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
-    )
+    return _job_out(job)
 
 
 @router.get("/assessments/latest", response_model=AssessmentResponse | None)
@@ -309,7 +337,7 @@ def update_task(
         task.completed_at = datetime.now(UTC) if body.status == "completed" else None
     if body.notes is not None:
         task.notes = body.notes
-    db.commit()
+    _commit(db)
     db.refresh(task)
     return _task_out(task)
 
@@ -319,6 +347,7 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
     profile = db.query(Profile).filter(Profile.user_id == user.id).first()
     assessment = _latest_assessment(db, user.id)
     roadmap = _latest_roadmap(db, user.id)
+    job = _latest_job(db, user.id)
     tasks = sorted(roadmap.tasks, key=lambda item: item.sort_order) if roadmap else []
     next_task = next((task for task in tasks if task.status != "completed"), None)
     recent = sorted(
@@ -333,6 +362,7 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
         top_gaps = [item for item in assessment_out.competencies if item.status != "sufficient"][:4]
         resources = assessment_out.resources[:6]
     return DashboardResponse(
+        latest_job=_job_out(job) if job else None,
         profile=_profile_out(profile) if profile else None,
         assessment=assessment_out,
         roadmap=_roadmap_out(roadmap) if roadmap else None,

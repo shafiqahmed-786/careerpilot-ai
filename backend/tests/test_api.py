@@ -112,3 +112,6 @@ def test_worker_persists_roadmap_and_ownership(client: TestClient, monkeypatch) 
     assert board["recently_completed"][0]["id"] == task_id
     assert board["profile"]["target_career"] == "Backend Engineer"
     assert board["top_gaps"]
+    assert board["latest_job"]["status"] == "completed"
+    assert board["latest_job"]["id"] == job_id
+    assert board["next_task"]["id"] != task_id

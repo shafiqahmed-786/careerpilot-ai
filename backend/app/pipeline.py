@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.ai import enrich_narrative
 from app.catalog import CATALOG, DISCLAIMER, RUBRIC_VERSION, normalize_role
-from app.gaps import score_gaps
+from app.gaps import focus_skills, score_gaps
 from app.models import (
     Assessment,
     AssessmentJob,
@@ -26,9 +26,8 @@ def run_and_persist(db: Session, job: AssessmentJob, profile: Profile) -> tuple[
     role_key, role_title = normalize_role(profile.target_career)
     competencies = CATALOG[role_key]["competencies"]
     gaps = score_gaps(competencies, profile.skills or [])
-    focus_names = [gap.name for gap in gaps if gap.status != "sufficient"][: max(1, profile.timeline_weeks // 2)]
-    if not focus_names:
-        focus_names = [gap.name for gap in gaps[:3]]
+    # The same focus list drives resource discovery and the roadmap, so every task has resources.
+    focus_names = [gap.name for gap in focus_skills(gaps, profile.timeline_weeks)]
 
     resources = []
     for name in focus_names:

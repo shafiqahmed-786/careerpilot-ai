@@ -1,5 +1,6 @@
 """RQ entrypoint. Run in a separate process from the API."""
 
+import logging
 from datetime import UTC, datetime
 
 from app.database import SessionLocal
@@ -40,6 +41,7 @@ def process_assessment_job(job_id: str) -> None:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     connection = redis_conn()
     worker = worker_class()([QUEUE_NAME], connection=connection)
     worker.work()
