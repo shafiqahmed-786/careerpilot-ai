@@ -1,0 +1,16 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/conftest.py" = ["E402"]
+"alembic/env.py" = ["E402", "I001"]
+"alembic/versions/*.py" = ["I001", "E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
