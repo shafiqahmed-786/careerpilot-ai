@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { api, setToken } from "@/lib/api";
 
@@ -13,6 +13,12 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("expired")) {
+      setError("Your session expired. Please sign in again.");
+    }
+  }, []);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setPending(true);
@@ -20,7 +26,7 @@ export default function LoginPage() {
     try {
       const result = await api<{ access_token: string }>("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
       setToken(result.access_token);
       router.push("/dashboard");
@@ -57,7 +63,11 @@ export default function LoginPage() {
             value={password}
           />
         </label>
-        {error ? <p className="text-sm text-clay">{error}</p> : null}
+        {error ? (
+          <p className="text-sm text-clay" role="alert">
+            {error}
+          </p>
+        ) : null}
         <button className="w-full rounded-full bg-moss py-2.5 text-white disabled:opacity-60" disabled={pending} type="submit">
           {pending ? "Signing in…" : "Sign in"}
         </button>

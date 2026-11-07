@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { api, setToken } from "@/lib/api";
+import { emailProblem, passwordProblem } from "@/lib/validation";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -15,12 +16,17 @@ export default function SignupPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    setPending(true);
     setError("");
+    const problem = emailProblem(email) ?? passwordProblem(password);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setPending(true);
     try {
       const result = await api<{ access_token: string }>("/api/v1/auth/signup", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
       setToken(result.access_token);
       router.push("/onboarding");
@@ -35,7 +41,7 @@ export default function SignupPage() {
     <main className="mx-auto max-w-md px-5 py-16">
       <h1 className="font-serif text-4xl">Create your account</h1>
       <p className="mt-2 text-muted">Passwords are hashed. Sessions use a signed token that expires.</p>
-      <form className="mt-8 space-y-4" onSubmit={onSubmit}>
+      <form className="mt-8 space-y-4" noValidate onSubmit={onSubmit}>
         <label className="block text-sm">
           Email
           <input
@@ -58,8 +64,13 @@ export default function SignupPage() {
             type="password"
             value={password}
           />
+          <span className="mt-1 block text-xs text-muted">At least 8 characters, at most 72 bytes.</span>
         </label>
-        {error ? <p className="text-sm text-clay">{error}</p> : null}
+        {error ? (
+          <p className="text-sm text-clay" role="alert">
+            {error}
+          </p>
+        ) : null}
         <button className="w-full rounded-full bg-moss py-2.5 text-white disabled:opacity-60" disabled={pending} type="submit">
           {pending ? "Creating account…" : "Continue to profile"}
         </button>

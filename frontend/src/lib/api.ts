@@ -36,6 +36,7 @@ export type Resource = {
 
 export type Assessment = {
   id: string;
+  created_at: string;
   target_career: string;
   normalized_role: string;
   summary: string;
@@ -80,9 +81,11 @@ export type Job = {
   error: string | null;
   assessment_id: string | null;
   roadmap_id: string | null;
+  created_at: string;
 };
 
 export type Dashboard = {
+  latest_job: Job | null;
   profile: Profile | null;
   assessment: Assessment | null;
   roadmap: Roadmap | null;
@@ -94,9 +97,20 @@ export type Dashboard = {
 };
 
 const TOKEN_KEY = "careerpilot_token";
+const AUTH_PATHS = ["/api/v1/auth/login", "/api/v1/auth/signup"];
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 export function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  return (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
 }
 
 export function getToken(): string | null {
@@ -112,6 +126,51 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  email: "Email",
+  password: "Password",
+  full_name: "Full name",
+  target_career: "Target career",
+  weekly_hours: "Weekly hours",
+  timeline_weeks: "Timeline",
+  experience_level: "Experience",
+  skills: "Skills",
+};
+
+/** Turns a FastAPI `detail` (string or list of validation errors) into one readable sentence. */
+export function formatErrorDetail(detail: unknown): string | null {
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (!Array.isArray(detail)) return null;
+  const messages: string[] = [];
+  for (const item of detail) {
+    if (!item || typeof item !== "object") continue;
+    const entry = item as { loc?: unknown[]; msg?: unknown };
+    if (typeof entry.msg !== "string") continue;
+    const message = entry.msg.replace(/^Value error,\s*/, "");
+    const field = (entry.loc || []).filter((part): part is string => typeof part === "string" && part !== "body");
+    const key = field[0] ?? "";
+    const label = FIELD_LABELS[key] ?? key;
+    messages.push(label && !message.toLowerCase().startsWith(label.toLowerCase()) ? `${label}: ${message}` : message);
+  }
+  return messages.length ? messages.join(". ") : null;
+}
+
+export function fallbackMessage(status: number): string {
+  if (status === 401) return "Your session is not valid. Please sign in again.";
+  if (status === 403) return "You do not have access to that.";
+  if (status === 404) return "That item was not found.";
+  if (status === 429) return "Too many requests. Wait a moment and try again.";
+  if (status >= 500) return `The server hit an error (HTTP ${status}). Check the API logs.`;
+  return `Request failed (HTTP ${status}).`;
+}
+
+export function networkMessage(base: string): string {
+  return (
+    `Cannot reach the CareerPilot API at ${base}. Check that the backend is running ` +
+    "(GET /api/v1/health), that NEXT_PUBLIC_API_URL points to it, and that CORS_ORIGINS includes this site."
+  );
+}
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (!headers.has("Content-Type") && options.body) {
@@ -119,13 +178,35 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   }
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${apiBase()}${path}`, { ...options, headers });
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase()}${path}`, { ...options, headers });
+  } catch {
+    throw new ApiError(networkMessage(apiBase()), 0);
+  }
+
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: unknown = null;
+  let parsed = true;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      parsed = false;
+    }
+  }
+
   if (!response.ok) {
-    const detail = data?.detail;
-    const message = typeof detail === "string" ? detail : "Request failed";
-    throw new Error(message);
+    if (response.status === 401 && token && !AUTH_PATHS.includes(path)) {
+      clearToken();
+      if (typeof window !== "undefined") window.location.assign("/login?expired=1");
+    }
+    const detail = parsed && data && typeof data === "object" ? (data as { detail?: unknown }).detail : null;
+    throw new ApiError(formatErrorDetail(detail) ?? fallbackMessage(response.status), response.status);
+  }
+  if (!parsed) {
+    throw new ApiError("The API returned an unexpected response. Is NEXT_PUBLIC_API_URL pointing at the CareerPilot API?", response.status);
   }
   return data as T;
 }

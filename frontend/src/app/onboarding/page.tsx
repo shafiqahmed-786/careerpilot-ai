@@ -60,7 +60,10 @@ export default function OnboardingPage() {
     setPending(true);
     setError("");
     const cleaned = skills
-      .map((skill) => ({ name: skill.name.trim(), proficiency: Number(skill.proficiency) }))
+      .map((skill) => ({
+        name: skill.name.trim(),
+        proficiency: Math.max(0, Math.min(5, Math.round(Number(skill.proficiency) || 0))),
+      }))
       .filter((skill) => skill.name);
     try {
       await api("/api/v1/profile", {
@@ -76,8 +79,7 @@ export default function OnboardingPage() {
           timeline_weeks: Number(weeks),
         }),
       });
-      const job = await api<{ id: string }>("/api/v1/assessments", { method: "POST" });
-      sessionStorage.setItem("careerpilot_job", job.id);
+      await api("/api/v1/assessments", { method: "POST" });
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the profile");
@@ -141,9 +143,16 @@ export default function OnboardingPage() {
               </label>
             </div>
           ))}
-          <button className="text-sm text-moss" onClick={() => setSkills((current) => [...current, emptySkill()])} type="button">
-            Add skill
-          </button>
+          <div className="flex gap-4 text-sm">
+            <button className="text-moss" onClick={() => setSkills((current) => [...current, emptySkill()])} type="button">
+              Add skill
+            </button>
+            {skills.length > 1 ? (
+              <button className="text-muted" onClick={() => setSkills((current) => current.slice(0, -1))} type="button">
+                Remove last
+              </button>
+            ) : null}
+          </div>
         </fieldset>
         <label className="block text-sm">
           Projects or experience
@@ -163,7 +172,11 @@ export default function OnboardingPage() {
             </select>
           </label>
         </div>
-        {error ? <p className="text-sm text-clay">{error}</p> : null}
+        {error ? (
+          <p className="text-sm text-clay" role="alert">
+            {error}
+          </p>
+        ) : null}
         <button className="rounded-full bg-moss px-5 py-2.5 text-white disabled:opacity-60" disabled={pending} type="submit">
           {pending ? "Building your plan…" : "Save and generate roadmap"}
         </button>

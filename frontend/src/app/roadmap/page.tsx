@@ -13,6 +13,8 @@ export default function RoadmapPage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const current = await api<Roadmap | null>("/api/v1/roadmaps/current");
@@ -32,18 +34,31 @@ export default function RoadmapPage() {
 
   async function update(task: Task, status: string) {
     setError("");
+    setBusyId(task.id);
     try {
       await api(`/api/v1/tasks/${task.id}`, {
         method: "PATCH",
         body: JSON.stringify({ status, notes: notes[task.id] || "" }),
       });
       await load();
+      setSavedId(task.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update the task");
+    } finally {
+      setBusyId(null);
     }
   }
 
   if (loading) return <main className="mx-auto max-w-4xl px-5 py-16 text-muted">Loading roadmap…</main>;
+  if (!plan && error) {
+    return (
+      <main className="mx-auto max-w-3xl px-5 py-16">
+        <p className="text-clay" role="alert">
+          {error}
+        </p>
+      </main>
+    );
+  }
   if (!plan) {
     return (
       <main className="mx-auto max-w-3xl px-5 py-16">
@@ -62,7 +77,11 @@ export default function RoadmapPage() {
       <h1 className="mt-2 font-serif text-4xl">{plan.title}</h1>
       <p className="mt-3 max-w-3xl leading-relaxed text-muted">{plan.overview}</p>
       <p className="mt-2 text-sm text-muted">{plan.weekly_hours} planned hours each week.</p>
-      {error ? <p className="mt-4 text-sm text-clay">{error}</p> : null}
+      {error ? (
+        <p className="mt-4 text-sm text-clay" role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className="mt-8 space-y-8">
         {weeks.map((week) => {
           const tasks = plan.tasks.filter((task) => task.week_number === week);
@@ -98,14 +117,20 @@ export default function RoadmapPage() {
                       Notes
                       <textarea
                         className="mt-1 w-full rounded-xl border border-line px-3 py-2"
-                        onChange={(event) => setNotes((current) => ({ ...current, [task.id]: event.target.value }))}
+                        onChange={(event) => {
+                          setSavedId(null);
+                          setNotes((current) => ({ ...current, [task.id]: event.target.value }));
+                        }}
                         value={notes[task.id] || ""}
                       />
                     </label>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {(["pending", "in_progress", "completed"] as const).map((status) => (
                         <button
-                          className="rounded-full border border-line px-3 py-1 text-sm hover:border-moss"
+                          className={`rounded-full border px-3 py-1 text-sm hover:border-moss disabled:opacity-60 ${
+                            task.status === status ? "border-moss bg-[#e5f3ee] text-moss" : "border-line"
+                          }`}
+                          disabled={busyId === task.id}
                           key={status}
                           onClick={() => update(task, status)}
                           type="button"
@@ -113,6 +138,15 @@ export default function RoadmapPage() {
                           Mark {statusLabel(status).toLowerCase()}
                         </button>
                       ))}
+                      <button
+                        className="rounded-full border border-line px-3 py-1 text-sm hover:border-moss disabled:opacity-60"
+                        disabled={busyId === task.id || (notes[task.id] || "") === (task.notes || "")}
+                        onClick={() => update(task, task.status)}
+                        type="button"
+                      >
+                        Save notes
+                      </button>
+                      {savedId === task.id ? <span className="self-center text-xs text-moss">Saved</span> : null}
                     </div>
                   </article>
                 ))}
