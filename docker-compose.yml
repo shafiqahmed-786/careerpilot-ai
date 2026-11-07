@@ -1,3 +1,5 @@
+# Default:  docker compose up -d            -> PostgreSQL + Redis only (run API, worker, web locally)
+# Full API: docker compose --profile app up --build   -> also runs migrations, API (:8000) and worker
 services:
   postgres:
     image: postgres:16-alpine
@@ -26,11 +28,13 @@ services:
       retries: 12
 
   api:
+    profiles: ["app"]
     build: ./backend
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     environment:
       APP_ENV: ${APP_ENV:-development}
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-10080}
       DATABASE_URL: postgresql+psycopg2://careerpilot:careerpilot@postgres:5432/careerpilot
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -46,6 +50,7 @@ services:
         condition: service_healthy
 
   worker:
+    profiles: ["app"]
     build: ./backend
     command: python -m app.worker
     environment:

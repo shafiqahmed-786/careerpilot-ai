@@ -1,3 +1,5 @@
+# Render blueprint: API + separate RQ worker. Create PostgreSQL and Redis (Key Value) in Render
+# (or use external ones) and paste their internal URLs into DATABASE_URL / REDIS_URL.
 services:
   - type: web
     name: careerpilot-api
@@ -6,9 +8,41 @@ services:
     buildCommand: pip install -r requirements.txt && alembic upgrade head
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false # e.g. https://your-app.vercel.app (comma-separated, no trailing slash)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
   - type: worker
     name: careerpilot-worker
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: python -m app.worker
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        sync: false # must match the API service value
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
