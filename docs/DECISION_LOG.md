@@ -2,14 +2,22 @@
 
 | Decision | Reason |
 | --- | --- |
-| New tree at `careerpilot-ai` | No CareerPilot project was present on this machine. The Linux path in the brief does not exist here. |
-| JWT and bcrypt instead of Clerk | No Clerk keys or existing Clerk integration were available. Tokens expire and passwords are hashed. |
+| New standalone project | The brief requires a new project, not an extension of RuFlow or MedResearch. |
+| FastAPI + PostgreSQL + Alembic | Typed API, relational ownership, versioned schema. |
+| JWT and bcrypt instead of a hosted auth provider | No external account is needed to run or review the MVP. Tokens expire; passwords are hashed. |
+| Reject passwords over 72 UTF-8 bytes | bcrypt ignores everything past 72 bytes (and newer versions raise). Rejecting is honest; silent truncation is not. |
+| Validate email with `email-validator`, store lower-case | Prevents case-variant duplicates. Syntax only, no DNS lookup, so it works offline and in CI. |
+| Unique index is the source of truth for duplicates | A pre-check is not race-safe. An `IntegrityError` is caught, rolled back, and returned as `409`. |
 | Scores in code, prose in the model | A rubric can be tested. A model must not be the source of a priority score or a URL. |
-| Tavily or a labelled demo catalog | Live search is the right default, and local development still works with no key. |
-| No RAG | There is no private corpus. Public learning links are a search problem. |
-| Redis + RQ, not Celery | The brief requires RQ and a separate worker. One queue is enough. |
-| `SimpleWorker` on Windows | CPython on Windows cannot `fork`. RQ's Unix alarm also does not exist, so the Windows worker uses a no-op death penalty. |
-| SQLite in pytest, PostgreSQL in Docker and production | CI and laptops can run tests without a database service. The migration uses portable types and is what production runs. |
-| String UUID primary keys | The same ids work on SQLite and PostgreSQL. |
-| CORS includes localhost and 127.0.0.1 | Browsers treat those hosts as different origins. |
-| No GitHub push | The brief says the user handles repository creation, commits, and deployment accounts. |
+| Tavily or a labelled demo catalog | Live search by default when configured; development and CI work with no key. |
+| No RAG / vector database | There is no private corpus. Public learning links are a search problem. |
+| Redis + RQ, separate worker | Keeps slow external calls out of requests; one queue is enough. |
+| `SimpleWorker` on Windows | Windows cannot `fork` or arm `SIGALRM`; the worker is still a separate process. |
+| 500 handler inside CORS middleware | Otherwise an unhandled error has no CORS headers and the browser reports "Failed to fetch", hiding the cause. |
+| Any localhost port allowed in non-production CORS | Browsers treat `localhost`, `127.0.0.1`, and each port as different origins; a mismatch looked like a signup failure. |
+| One App Router tree: `frontend/src/app` | A root `app/` directory takes precedence over `src/app/`; duplicate trees silently shadow each other. `@/*` already maps to `src/*`. |
+| Dashboard returns `latest_job` | Polling survives page refreshes (no reliance on `sessionStorage`) and shows failures with a retry. |
+| Compose profiles | `docker compose up -d` starts only PostgreSQL and Redis; API and worker containers are opt-in (`--profile app`). |
+| SQLite in pytest, PostgreSQL elsewhere | Tests need no database service; the migration uses portable types. |
+| String UUID primary keys | Same ids on SQLite and PostgreSQL. |
+| No push, no deployment from the build environment | The owner creates the GitHub repository and deploys. |

@@ -2,30 +2,44 @@
 
 ```mermaid
 flowchart LR
-  Browser[Next.js browser] --> API[FastAPI]
-  API --> PG[(PostgreSQL)]
-  API --> RQ[Redis queue careerpilot]
-  RQ --> Worker[RQ worker process]
+  Browser["Next.js frontend"] -->|"REST + JWT"| API["FastAPI /api/v1"]
+  API --> PG[("PostgreSQL")]
+  API -->|"enqueue job id"| Redis[("Redis queue 'careerpilot'")]
+  Redis --> Worker["RQ worker (python -m app.worker)"]
   Worker --> PG
-  Worker --> Rubric[gap rubric in code]
-  Worker --> Search[Tavily or demo catalog]
-  Worker --> Narrative[OpenAI or template]
+  Worker --> Gaps["Gap engine (app/gaps.py)"]
+  Worker --> Search["Tavily or demo catalog (app/search.py)"]
+  Worker --> LLM["OpenAI or template (app/ai.py)"]
+  Worker --> Road["Roadmap builder (app/roadmap_builder.py)"]
 ```
 
-## Frontend
+## Components
 
-Next.js 15 App Router in `frontend/app`. Shared helpers are in `frontend/src/lib` and `frontend/src/components`. The browser stores the access token in `localStorage` and sends `Authorization: Bearer`. After profile save, the client polls `GET /api/v1/jobs/{id}` until the worker finishes.
+| Component | Responsibility | Code |
+| --- | --- | --- |
+| Frontend | Pages, forms, polling, token storage, error messages | `frontend/src/app`, `frontend/src/lib`, `frontend/src/components` |
+| API | Auth, profile, job creation, reads, task updates, health | `backend/app/api.py`, `main.py`, `security.py`, `schemas.py` |
+| Database | Users, profile, jobs, assessments, resources, roadmaps, tasks | `backend/app/models.py`, `backend/alembic` |
+| Queue | Transport for job ids | `backend/app/queue.py` (Redis, RQ) |
+| Worker | Runs the pipeline outside the request | `backend/app/worker.py`, `pipeline.py` |
+| AI | Narrative text only | `backend/app/ai.py` |
+| Resource discovery | Tavily search or labelled catalog | `backend/app/search.py`, `catalog.py` |
 
-Screens: landing, signup, login, profile, dashboard, roadmap.
+## Request flow for an assessment
 
-## Backend
+1. `PUT /profile` stores the profile.
+2. `POST /assessments` inserts an `assessment_jobs` row (`queued`), enqueues its id, returns `202`. If Redis is unavailable the row becomes `failed` and the API returns `503`.
+3. The worker sets `running`, loads the profile, scores gaps, discovers resources for the focus skills, writes the narrative, builds tasks, inserts assessment + competencies + resources + roadmap + tasks, then sets `completed` with the new ids. Any exception sets `failed` with the message.
+4. The dashboard calls `GET /dashboard` (which includes `latest_job`) every two seconds while the job is `queued` or `running`, so a refresh does not lose track of a job. A queued job that stays queued shows a hint to start the worker.
 
-`backend/app/main.py` mounts `backend/app/api.py`. Settings are in `app/config.py`. Sessions are in `app/database.py`.
+## Cross-cutting behaviour
 
-## Worker
+- **Authorization:** the user comes from the JWT; every read/write filters by `user_id`; foreign ids return `404`.
+- **Errors:** validation errors are `422` with field messages; duplicate email `409`; database failures `503` with a migration hint; unexpected errors `500` JSON. The 500 handler sits inside the CORS middleware so the browser sees the real status, not "Failed to fetch".
+- **CORS:** `CORS_ORIGINS` plus, outside production, any `localhost`/`127.0.0.1` port.
+- **Readiness:** `/health/ready` reports database, migrations (users table present), Redis, and demo/live modes.
+- **Windows:** `WindowsWorker` (SimpleWorker, no SIGALRM) when `os.name == "nt"`.
 
-`app/queue.py` enqueues `app.worker.process_assessment_job`. `app/worker.py` marks the job running, calls `app/pipeline.py`, then stores the assessment and roadmap ids on the job. The API process does not run the model or the search.
+## Deployment shape
 
-## Why these boundaries
-
-The interviewer asked for a browser app, a REST API, PostgreSQL, and a real background worker. The pipeline is a straight function chain rather than an agent framework. That keeps failure handling in one place: a failed job row with an error string.
+Vercel (frontend) → Render web service (API, runs `alembic upgrade head` on build) + Render worker → managed PostgreSQL and Redis. See the README.

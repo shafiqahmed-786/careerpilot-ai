@@ -8,5 +8,6 @@ Work in this repository. Do not recreate the frontend or backend.
 - Demo mode is the default when `OPENAI_API_KEY` or `TAVILY_API_KEY` is empty. Keep the `demo` label.
 - Authorize with the JWT subject. Filter every read and write by `user_id`.
 - On Windows, run the queue with `WindowsWorker` from `app/queue.py`.
-- Tests: `cd backend` then `pytest`. Frontend: `npm test` and `npm run build`.
+- Frontend routes live only in `frontend/src/app` (no root `app/` directory). Shared code is imported with `@/*` (maps to `src/*`).
+- Tests: `cd backend` then `python -m pytest -q`. Frontend: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
 - Do not commit `.env`. Do not claim a deployment that has not been verified.

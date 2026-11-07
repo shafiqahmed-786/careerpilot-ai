@@ -2,124 +2,120 @@
 
 **Your career goal. A personalized roadmap. Measurable progress.**
 
-CareerPilot AI is a career-learning product for students and fresh graduates. A person enters a target role and the skills they believe they already have. A background worker turns that profile into a scored skill-gap assessment, a set of real learning links, and a saved 4-, 8-, or 12-week roadmap. Progress on the dashboard is the share of roadmap tasks marked complete in PostgreSQL.
+> **Live demo:** _not deployed yet_ <!-- DEPLOYED_URL: after deploying, replace this line with: **Live demo:** https://YOUR-VERCEL-APP.vercel.app (API: https://YOUR-RENDER-API.onrender.com/api/v1/health) -->
 
-This repository is an interview MVP for Spektra Systems. It is not a hosted production service.
+CareerPilot AI is an AI-powered career guidance and learning-roadmap platform for students and fresh graduates. A user enters a target career, current skills with self-reported proficiency, education, experience, and weekly availability. A **separate background worker** scores the skill gaps with a deterministic rubric, finds learning resources (Tavily live search, or a clearly labelled demo catalog), writes an AI-assisted explanation (OpenAI, or a labelled template), and saves a 4-, 8-, or 12-week roadmap. Progress is tracked per task in PostgreSQL.
+
+It is an independent project. It does not share code with RuFlow or MedResearch.
+
+## Interview requirements → where they are met
+
+| Requirement | Where |
+| --- | --- |
+| Free choice of problem (AI Career Coach) | Whole product; see `docs/PRD.md` |
+| New project, fresh public repo | Standalone repo; you create the GitHub remote (see [GitHub and deployment](#github-and-deployment)) |
+| Frontend | Next.js 15 / React 19 / TypeScript / Tailwind in `frontend/` |
+| API | FastAPI in `backend/app/api.py`, mounted at `/api/v1` |
+| Database | PostgreSQL, SQLAlchemy models, Alembic migration `0001_initial` |
+| Background worker / queue | Redis + RQ, run as its own process: `python -m app.worker` |
+| AI component | Deterministic gap scoring + OpenAI narrative + Tavily discovery (`app/gaps.py`, `app/ai.py`, `app/search.py`) |
+| Authentication | bcrypt + JWT; every user-specific route is protected and owner-scoped |
+| Built with AI coding agents | Agent notes in `CLAUDE.md` / `AGENTS.md`; decisions in `docs/` |
+| Specification and planning docs in the repo | `docs/PRD.md`, `ARCHITECTURE.md`, `IMPLEMENTATION_PLAN.md`, `AI_ENGINEERING_DECISIONS.md`, `DATA_MODEL.md`, `DECISION_LOG.md`, `TESTING_STRATEGY.md` |
+| Tests, CI, deployed link | Pytest + Vitest, `.github/workflows/ci.yml`; deployed link goes at the marker at the top of this file |
+| README explains architecture and decisions | This file, plus `docs/` |
 
 ## Problem
 
-Naming a job is not a study plan. Students can list “backend engineer” and still not know which skill to practice first, which documentation is worth opening, or whether last week’s work changed anything. A chat answer disappears, is not tied to the profile, and cannot be marked done.
+Naming a job is not a study plan. A student can say "backend engineer" and still not know which skill to practise first, which material is worth opening, or whether last week's work moved them forward. A chat answer disappears, is not tied to a profile, and cannot be ticked off. CareerPilot keeps the profile, the rubric result, the links, and the tasks in one account.
 
-CareerPilot keeps the profile, the rubric result, the links, and the tasks in one account.
+## Features
 
-## Key features
-
-| Feature | What the product does |
+| Feature | What it does |
 | --- | --- |
-| Account | Sign up and sign in. Passwords are hashed. Access tokens expire. |
-| Profile | Education, experience level, self-reported skills (0–5), projects, target career, weekly hours, and a 4-, 8-, or 12-week timeline. |
-| Assessment | A queued job normalizes the role, scores competencies, and explains what to learn first. |
-| Skill gaps | Priority is `importance × gap`. Labels distinguish “not reported”, “below target”, and “meets target”. |
-| Resources | Tavily when `TAVILY_API_KEY` is set. Otherwise a labelled demo catalog of real public URLs. |
-| Roadmap | Weeks, objectives, tasks, estimated hours, outcomes, completion criteria, and the same resource URLs. |
-| Progress | Task status and notes persist. The dashboard percentage is calculated from those rows. |
+| Account | Sign up and sign in. bcrypt-hashed passwords, expiring JWTs. |
+| Career profile | Name, education, experience level, skills with 0–5 self-reported proficiency, projects, target career, weekly hours, 4/8/12-week duration. |
+| Assessment | Queued job. Normalizes the role, scores every competency, explains what to learn first. |
+| Skill gaps | `priority = importance × gap`. Labels: not reported / below target / meets target. |
+| Resources | Tavily when `TAVILY_API_KEY` is set. Otherwise a labelled demo catalog of real public URLs. URLs are never invented. |
+| Roadmap | Weekly objectives, tasks, estimated hours, expected outcomes, completion criteria, resource links. |
+| Progress | Mark tasks pending / in progress / completed and keep notes. Survives refresh. The dashboard reads the same rows. |
+| Resilience | Job states `queued → running → completed / failed` with clear UI messages, a retry button, and a hint when the worker is not running. |
 
 ## Screenshots
 
-Screenshot files are not committed. The landing page, signup form, and career profile were opened locally in a browser against the running API. A dev-only Next.js error badge was on screen during that pass because the first signup request used `http://127.0.0.1:3000` before that origin was added to CORS. Signup then returned `201` and the profile form rendered. Do not treat those captures as product screenshots.
-
-## User journey
-
-1. Open the app and create an account.
-2. Complete the career profile, including the target role and self-reported skills.
-3. Choose **Save and generate roadmap**.
-4. The API inserts an `assessment_jobs` row and enqueues it on Redis.
-5. A separate RQ worker scores gaps, discovers resources, and writes the assessment and roadmap.
-6. The dashboard polls the job, then shows the career goal, gaps, next task, resources, and completion.
-7. On the roadmap page, mark a task pending, in progress, or completed and add a note.
-8. The dashboard percentage and “recently completed” list change from those database rows.
+No screenshot files are committed. After you run the app, add captures to `docs/screenshots/` and reference them here.
 
 ## Technology stack
 
-| Layer | Choice |
+| Layer | Technology |
 | --- | --- |
-| Frontend | Next.js 15 App Router, React 19, TypeScript, Tailwind CSS |
-| API | Python 3.12, FastAPI, Pydantic, SQLAlchemy 2, Alembic |
-| Database | PostgreSQL 16. Tests apply the same migration to SQLite. |
-| Queue | Redis 7 and RQ. The worker is a separate process. |
-| Auth | bcrypt password hashes and HS256 JWTs. Clerk is not integrated. |
-| Narrative | OpenAI Chat Completions when `OPENAI_API_KEY` is set. Otherwise a template labelled `demo`. |
-| Search | Tavily when `TAVILY_API_KEY` is set. Otherwise the demo catalog. |
+| Frontend | Next.js 15 (App Router, single tree in `frontend/src/app`), React 19, TypeScript, Tailwind CSS |
+| API | Python 3.12, FastAPI, Pydantic v2 |
+| Database | PostgreSQL 16, SQLAlchemy 2, Alembic |
+| Queue | Redis 7, RQ (separate worker process; Windows-compatible worker class) |
+| AI | OpenAI Chat Completions (optional, narrative only) |
+| Resource discovery | Tavily Search API (optional) with labelled fallback catalog |
+| Auth | bcrypt, PyJWT (HS256) |
+| Tests | Pytest (+ fakeredis, SQLite-backed migration), Vitest |
+| CI | GitHub Actions |
+| Local services | Docker Compose (PostgreSQL, Redis; optional API + worker) |
 
-## System architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-  Browser[Next.js browser] --> API[FastAPI /api/v1]
-  API --> PG[(PostgreSQL)]
-  API --> Redis[(Redis queue careerpilot)]
-  Redis --> Worker[RQ worker process]
+  Browser["Next.js frontend<br/>(Vercel / localhost:3000)"] -->|"REST + JWT"| API["FastAPI /api/v1"]
+  API --> PG[("PostgreSQL")]
+  API -->|"enqueue job id"| Redis[("Redis queue 'careerpilot'")]
+  Redis --> Worker["RQ worker process<br/>python -m app.worker"]
   Worker --> PG
-  Worker --> Rubric[gap rubric in code]
-  Worker --> Search[Tavily or demo catalog]
-  Worker --> Narrative[OpenAI or template]
+  Worker --> Gaps["Skill-gap engine<br/>(deterministic rubric)"]
+  Worker --> Search["Tavily search<br/>or labelled demo catalog"]
+  Worker --> LLM["OpenAI narrative<br/>or labelled template"]
+  Worker --> Road["Roadmap builder"]
 ```
 
-The API process does not call the model or the search provider. It records the job and returns `202`. The worker owns the pipeline.
+The API never calls the model or the search provider. It records a job row, enqueues its id, and returns `202`. The worker owns the pipeline: `profile → normalize role → score gaps → discover resources → narrative → roadmap → PostgreSQL`.
 
-## Frontend
+### Components
 
-Pages live in `frontend/app` and share the landing-page type and color system: paper background, serif headlines, moss actions.
+- **Frontend** (`frontend/src`): routes `/`, `/signup`, `/login`, `/onboarding`, `/dashboard`, `/roadmap`. `src/lib/api.ts` is the only HTTP client; it turns non-JSON, 422, 5xx, and network failures into readable messages and sends the user to `/login` when a token expires.
+- **API** (`backend/app`): `api.py` routes, `security.py` bcrypt/JWT, `schemas.py` validation, `models.py` ORM, `main.py` CORS + error handling + health checks.
+- **Worker** (`app/worker.py`, `app/queue.py`, `app/pipeline.py`): consumes `app.worker.process_assessment_job`, writes the assessment and roadmap in one transaction, sets the job to `completed` or `failed` with an error message.
+- **Database**: PostgreSQL, schema in `backend/alembic/versions/0001_initial.py`.
 
-| Route | Role |
-| --- | --- |
-| `/` | Product introduction and the signup entry. |
-| `/signup`, `/login` | Create a session. The access token is stored in `localStorage`. |
-| `/onboarding` | Create or edit the career profile, then queue an assessment. |
-| `/dashboard` | Goal, assessment summary, gap bars, next task, resources, completion, recent tasks. |
-| `/roadmap` | Weeks, task details, notes, and status updates. |
+## Main user journey
 
-`frontend/src/lib/api.ts` calls `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`) and sends `Authorization: Bearer`. After a generate request, the job id is kept in `sessionStorage` and the dashboard polls `GET /api/v1/jobs/{id}` every two seconds.
+1. Landing page → **Create an account**.
+2. Signup validates the email and password, stores a bcrypt hash, returns a JWT; the frontend stores it and goes to onboarding.
+3. Onboarding saves the career profile (`PUT /profile`) and queues the assessment (`POST /assessments`, `202`).
+4. The RQ worker scores gaps, discovers resources, writes the narrative and roadmap, and marks the job `completed`.
+5. The dashboard polls until the job finishes, then shows the goal, assessment summary, gaps, resources, completion, next task, and recently completed tasks.
+6. The roadmap page lists weekly plans; tasks can be marked pending / in progress / completed and annotated. Refreshing keeps everything.
 
-Empty, loading, and error states are on the dashboard and roadmap. Unauthenticated visits to those pages go to `/login`.
-
-## Backend
-
-`backend/app/main.py` mounts the router in `backend/app/api.py` at `/api/v1`.
+## Backend API overview
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| `GET` | `/health` | No | Process is up. |
-| `GET` | `/health/ready` | No | Database ping, Redis ping, and which LLM and search modes are configured. |
-| `POST` | `/auth/signup` | No | Create a user and return a token. |
-| `POST` | `/auth/login` | No | Check the password and return a token. |
-| `GET` | `/auth/me` | Yes | Current user. |
-| `GET`, `PUT` | `/profile` | Yes | Read or save the career profile. |
-| `POST` | `/assessments` | Yes | Insert a job and enqueue it. Returns `202`. |
-| `GET` | `/jobs/{id}` | Yes | Job status for the owner. |
-| `GET` | `/assessments/latest` | Yes | Latest assessment, competencies, and resources. |
-| `GET` | `/roadmaps/current` | Yes | Latest roadmap and tasks. |
-| `PATCH` | `/tasks/{id}` | Yes | Status and notes for a task the caller owns. |
-| `GET` | `/dashboard` | Yes | Profile, assessment, roadmap, completion, next task, recent tasks, top gaps, resources. |
+| `GET` | `/api/v1/health` | No | Process is up |
+| `GET` | `/api/v1/health/ready` | No | Database, migrations applied, Redis, and active LLM/search modes |
+| `POST` | `/api/v1/auth/signup` | No | Create user, return token (`409` if the email exists, `422` on invalid input) |
+| `POST` | `/api/v1/auth/login` | No | Return token (`401` on bad credentials) |
+| `GET` | `/api/v1/auth/me` | Yes | Current user |
+| `GET` / `PUT` | `/api/v1/profile` | Yes | Read / save the career profile |
+| `POST` | `/api/v1/assessments` | Yes | Create a job and enqueue it (`202`; `503` if Redis is down) |
+| `GET` | `/api/v1/jobs/{id}` | Yes | Job status (owner only) |
+| `GET` | `/api/v1/assessments/latest` | Yes | Latest assessment, competencies, resources |
+| `GET` | `/api/v1/roadmaps/current` | Yes | Latest roadmap and tasks |
+| `PATCH` | `/api/v1/tasks/{id}` | Yes | Update status and notes (owner only) |
+| `GET` | `/api/v1/dashboard` | Yes | Everything the dashboard needs, including `latest_job` |
 
-Settings are in `backend/app/config.py`. `postgres://` and `postgresql://` URLs are rewritten to `postgresql+psycopg2://`.
+Interactive docs: `http://localhost:8000/docs`.
 
 ## Database design
 
-Identifiers are UUID strings. Timestamps are timezone-aware. The migration is `backend/alembic/versions/0001_initial.py`.
-
-| Table | What it stores |
-| --- | --- |
-| `users` | Email and password hash. |
-| `profiles` | One row per user. Skills are JSON objects `{name, proficiency}`. |
-| `assessment_jobs` | `queued`, `running`, `completed`, or `failed`, plus the RQ id, error, and result ids. |
-| `assessments` | Normalized role, summary, learn-first reason, disclaimer, narrative provider, rubric version. |
-| `competency_results` | One scored competency. Includes `user_id` so ownership does not require a join. |
-| `learning_resources` | Title, URL, domain, snippet, skill, relevance, and provider (`tavily` or `demo`). |
-| `roadmaps` | Title, timeline, weekly hours, overview, narrative provider. |
-| `roadmap_tasks` | Week, objective, skills, hours, outcome, criteria, resource JSON, status, notes. Unique `(roadmap_id, sort_order)`. |
-
-Completion is not a stored column. The API uses `round(completed_tasks * 100 / total_tasks)`.
+Full column-level description in `docs/DATA_MODEL.md`.
 
 ```mermaid
 erDiagram
@@ -132,274 +128,189 @@ erDiagram
   roadmaps ||--o{ roadmap_tasks : contains
 ```
 
+Completion percentage is not stored; it is computed from task rows (`round(completed × 100 / total)`).
+
 ## Authentication and authorization
 
-There is no Clerk project in this tree. Signup stores a bcrypt hash. Login returns an HS256 JWT whose `sub` is the user id and whose `exp` comes from `JWT_EXPIRE_MINUTES` (default 7 days).
+- Passwords: bcrypt. Because bcrypt only reads 72 bytes, signup rejects passwords longer than **72 bytes in UTF-8** instead of silently truncating them (the frontend and API both check bytes, not characters).
+- Email: validated with `email-validator` (syntax only) and lower-cased; a unique index guarantees one account per address. Concurrent duplicate signups are resolved by the index and return `409`.
+- Tokens: HS256 JWT with `sub = user id` and an expiry (`JWT_EXPIRE_MINUTES`). The frontend keeps it in `localStorage` and clears it on a `401`.
+- Authorization: every handler derives the user from the token and filters by `user_id`. Another user's job or task returns `404`.
+- Production: the API refuses to start with the default JWT secret when `APP_ENV=production`.
 
-Protected handlers load the user from the bearer token. They never accept a user id from the browser. A job or task that belongs to someone else returns `404`. In `APP_ENV=production`, startup refuses the default JWT secret `dev-only-change-me`.
+## AI integration and decision-making
 
-## AI career assessment
+- **Scores are deterministic.** `app/gaps.py` (rubric `importance-x-gap-v1`): `gap = max(0, target − self_reported)`, `priority = importance × gap`; `missing` = level 0, `improve` = below target, `sufficient` = at/above target. An LLM never produces or alters a number.
+- **AI writes prose only.** With `OPENAI_API_KEY`, the model rewrites `summary` and `learn_first_reason` from structured facts. Its output schema has no URL or score fields. On any failure the template narrative is stored and labelled `demo`.
+- **Tavily finds resources.** With `TAVILY_API_KEY`, results (https only) are stored with provider `tavily`. Otherwise (or if Tavily fails) the predefined catalog is used, stored as `demo`, and the UI says "Demo catalog, not live search".
+- **Untrusted web text.** Snippets are truncated and wrapped in `<untrusted_page>` tags in the prompt, with an instruction to treat them as data.
+- **No RAG.** There is no private corpus; learning links are a public-web search problem.
 
-`app/pipeline.py` runs this sequence inside the worker:
+More detail: `docs/AI_ENGINEERING_DECISIONS.md`.
 
-`profile → normalize role → score gaps → discover resources → narrative → roadmap → PostgreSQL`
+## Background worker and Redis queue
 
-Role matching lives in `app/catalog.py`. Known targets include backend, frontend, full stack, data analyst, data scientist, machine learning, DevOps, and QA. An unrecognized target uses the software engineer rubric.
+`POST /assessments` inserts an `assessment_jobs` row (`queued`), enqueues `app.worker.process_assessment_job` on queue `careerpilot`, and returns. The worker marks the job `running`, runs the pipeline, then `completed` (with `assessment_id` and `roadmap_id`) or `failed` (with an error). If Redis is unreachable the API marks the job `failed` and returns `503`.
 
-The optional model call may rewrite only `summary` and `learn_first_reason`. Scores and URLs are computed before that call. If the key is missing, the response is invalid, or the call fails, the template narrative is stored and `provider` is `demo`.
-
-The assessment always stores this disclaimer: self-reported levels are what the user entered. They are not an objective measure of competence.
-
-## Skill-gap calculation
-
-Rubric version `importance-x-gap-v1`, implemented in `app/gaps.py`:
-
-- `importance` is 1–5 for the role.
-- `target_level` is a study target, not a certification.
-- `self_reported_level` is copied from the profile. An unlisted skill is 0.
-- `gap = max(0, target_level - self_reported_level)`
-- `priority_score = importance * gap`
-- `missing`: self-reported level is 0.
-- `improve`: reported, but below the target.
-- `sufficient`: reported at or above the target.
-
-Aliases such as `postgres` map to SQL before scoring. A note on a skill cannot change the status. The recommendation text for an `improve` row says the comparison is not a verified score.
-
-## Tavily resource discovery
-
-`app/search.py` is separate from the LLM client. With `TAVILY_API_KEY`, the worker POSTs to `https://api.tavily.com/search` and keeps only `https` results. Each row stores title, URL, domain, a truncated snippet, the skill, and a relevance sentence written by the application.
-
-Without a key, or when Tavily errors or returns nothing usable, the worker uses the predefined pages in `app/catalog.py`. Those rows use `provider=demo` and say they are not a live search result. The dashboard shows that label. URLs in the demo catalog are real public documentation and course pages. The model is not allowed to invent URLs. Roadmap tasks copy the URLs already stored on the assessment.
-
-## Roadmap generation
-
-`app/roadmap_builder.py` builds one study task and one practice task per week from the highest-priority gaps, the weekly hour budget, and the resources just retrieved. Task fields are week, objective, skills, title, details, estimated hours, expected outcome, completion criteria, and resource links. The roadmap row and its tasks are inserted in the same worker transaction as the assessment.
-
-## Redis and RQ
-
-`POST /api/v1/assessments` commits the job, then `app/queue.py` enqueues `app.worker.process_assessment_job` on the queue named `careerpilot`. If Redis is down, the job is marked `failed` and the API returns `503`.
-
-Start the consumer as its own process:
-
-```bash
-python -m app.worker
-```
-
-On Linux the consumer is RQ’s forking `Worker`. On Windows, `os.fork` and `SIGALRM` do not exist, so the process uses `WindowsWorker` (`SimpleWorker` with the Unix timeout disabled). It is still a different process from the API. The queue name and job function are the same.
-
-## Web search instead of RAG
-
-The learning links a student needs are public and change: language docs, database manuals, course pages, and tutorials. A search request returns those URLs directly. The product does not have a private corpus to retrieve from, so a vector index would not answer the question.
-
-RAG becomes useful later if the product must quote the user’s own notes, a syllabus, or a curated internal library. Until then, search results are attributed on each resource row, snippets are length-limited, and page text is wrapped as untrusted input. The narrative schema has no URL field, so a page cannot add a link by telling the model to do so.
-
-## Project structure
-
-```text
-careerpilot-ai/
-  frontend/app/                 Next.js routes
-  frontend/src/lib/             API client and progress helper
-  frontend/src/components/      Shared header
-  backend/app/                  API, models, rubric, search, pipeline, worker
-  backend/alembic/versions/     0001_initial
-  backend/tests/                Auth, worker, gaps, schemas, demo search
-  docs/                         Product, architecture, data, testing, decisions
-  .github/workflows/ci.yml
-  docker-compose.yml
-  render.yaml
-  .env.example
-```
-
-## Prerequisites
-
-- Python 3.12
-- Node.js 22 and npm
-- Docker, with either `docker compose` or `docker-compose`
-- No OpenAI or Tavily key is required to run the demo path
-
-## Environment variables
-
-Copy the example file and edit the secret before sharing a deployment.
-
-```bash
-cp .env.example .env
-```
-
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `APP_ENV` | No | `development` or `production`. Production refuses the default JWT secret. |
-| `JWT_SECRET` | Yes in production | HMAC secret for access tokens. |
-| `JWT_EXPIRE_MINUTES` | No | Token lifetime. Default `10080` (7 days). |
-| `DATABASE_URL` | Yes | SQLAlchemy URL. Local default uses user, password, and database `careerpilot` on `localhost:5432`. |
-| `REDIS_URL` | Yes for assessments | Default `redis://localhost:6379/0`. |
-| `CORS_ORIGINS` | No | Comma-separated browser origins. Default includes `http://localhost:3000` and `http://127.0.0.1:3000`. |
-| `OPENAI_API_KEY` | No | Empty selects the demo narrative. |
-| `OPENAI_MODEL` | No | Default `gpt-4o-mini`. |
-| `OPENAI_BASE_URL` | No | Default `https://api.openai.com/v1`. |
-| `TAVILY_API_KEY` | No | Empty selects the demo resource catalog. |
-| `NEXT_PUBLIC_API_URL` | No | Browser API origin. Default `http://localhost:8000`. |
-
-Do not commit `.env` or `.env.local`.
+On Linux/macOS the worker is RQ's forking `Worker`. On Windows (no `fork`, no `SIGALRM`) it uses `WindowsWorker`, a `SimpleWorker` without the Unix timeout. It is still a separate process from the API.
 
 ## Local installation
 
-From the repository root:
+Prerequisites: Python 3.12, Node.js 22 + npm, Docker Desktop. No OpenAI or Tavily key is needed for the demo path.
 
-```bash
-python -m venv backend/.venv
-backend/.venv/bin/pip install -r backend/requirements.txt
-npm install --prefix frontend
-```
-
-On Windows PowerShell, use `backend\.venv\Scripts\pip` and `backend\.venv\Scripts\python`.
-
-## Docker Compose
-
-From the repository root, start PostgreSQL and Redis:
-
-```bash
-docker compose up -d postgres redis
-```
-
-If the Docker CLI on your machine has no `compose` subcommand, use `docker-compose up -d postgres redis`. That is the command that worked on the Windows machine used to develop this tree.
-
-The Compose file also defines `api` and `worker` services. Their database host is `postgres` and their Redis host is `redis`, which is correct only inside the Compose network. For the host-run commands below, keep `localhost` in `.env`.
-
-To run the API and worker in containers as well:
-
-```bash
-docker compose up --build api worker
-```
-
-## Database migrations
-
-With Postgres listening on `localhost:5432`:
-
-```bash
-cd backend
-alembic upgrade head
-```
-
-On Windows:
+### Windows PowerShell (recommended)
 
 ```powershell
-cd backend
-.\.venv\Scripts\alembic upgrade head
+# from the extracted project folder (the one containing docker-compose.yml)
+.\scripts\setup.ps1     # creates .env files, starts Postgres + Redis, venv, pip, migrations, npm ci
+.\scripts\dev.ps1       # opens API, worker, and frontend in three windows
+.\scripts\verify.ps1    # health checks + end-to-end smoke journey
 ```
 
-## Start the backend
+If PowerShell blocks scripts: `powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1`.
 
-```bash
-cd backend
-uvicorn app.main:app --reload --port 8000
-```
-
-Windows:
+Manual equivalent:
 
 ```powershell
+Copy-Item .env.example .env
+Copy-Item frontend\.env.example frontend\.env.local
+docker compose up -d --wait postgres redis
+
 cd backend
-.\.venv\Scripts\python -m uvicorn app.main:app --port 8000
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m alembic upgrade head
+.\.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000     # terminal 1
+
+.\.venv\Scripts\python -m app.worker                                    # terminal 2 (same backend folder)
+
+cd ..\frontend
+npm ci
+npm run dev                                                             # terminal 3
 ```
 
-Health: `GET http://localhost:8000/api/v1/health`
-
-Readiness, including database, Redis, and which external modes are active: `GET http://localhost:8000/api/v1/health/ready`
-
-## Start the worker
-
-In a second terminal, from `backend`, with the same `DATABASE_URL` and `REDIS_URL`:
+### Bash (macOS / Linux / Git Bash)
 
 ```bash
-python -m app.worker
+bash scripts/setup.sh
+cd backend && source .venv/bin/activate        # Git Bash: source .venv/Scripts/activate
+uvicorn app.main:app --reload --port 8000      # terminal 1
+python -m app.worker                           # terminal 2
+cd frontend && npm run dev                     # terminal 3
+bash scripts/verify.sh
 ```
 
-Windows:
+Open <http://localhost:3000>. If your Docker has no `compose` subcommand, use `docker-compose`.
+
+### Health checks
 
 ```powershell
-.\.venv\Scripts\python -m app.worker
+Invoke-RestMethod http://localhost:8000/api/v1/health
+Invoke-RestMethod http://localhost:8000/api/v1/health/ready
 ```
 
-Leave this process running. Assessment requests stay `queued` until it consumes them.
+`/health/ready` should report `database`, `migrations`, and `redis` as `true`. If signup shows a database error, `migrations` is usually `false`: run `alembic upgrade head` in `backend/`.
 
-## Start the frontend
+## Docker
 
 ```bash
-cd frontend
-npm run dev
+docker compose up -d                       # PostgreSQL + Redis only (default; run API/worker/web locally)
+docker compose --profile app up --build    # additionally build and run migrations + API (:8000) + worker
 ```
 
-Open `http://localhost:3000`.
+Inside Compose the API/worker use the hostnames `postgres` and `redis`. For host-run commands keep `localhost` in `.env`. Stop everything with `docker compose down` (add `-v` to delete the database volume). Do not run the host API and the containerised API at the same time; both use port 8000.
+
+## Environment variables
+
+Copy `.env.example` to `.env` (project root; read by the API, worker, and Alembic) and `frontend/.env.example` to `frontend/.env.local`. Never commit them.
+
+| Variable | Used by | Required | Purpose |
+| --- | --- | --- | --- |
+| `APP_ENV` | API, worker | No | `development` (default) or `production`; production refuses the default JWT secret and disables the any-localhost-port CORS rule |
+| `JWT_SECRET` | API | Production | HMAC secret for tokens. Generate: `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
+| `JWT_EXPIRE_MINUTES` | API | No | Default `10080` |
+| `DATABASE_URL` | API, worker, Alembic | Yes | `postgres://` and `postgresql://` are rewritten to `postgresql+psycopg2://` |
+| `REDIS_URL` | API, worker | Yes | Default `redis://localhost:6379/0` |
+| `CORS_ORIGINS` | API | Production | Comma-separated origins, no trailing slash, e.g. your Vercel URL |
+| `OPENAI_API_KEY` | worker | No | Empty → demo narrative |
+| `OPENAI_MODEL`, `OPENAI_BASE_URL` | worker | No | Defaults `gpt-4o-mini`, `https://api.openai.com/v1` |
+| `TAVILY_API_KEY` | worker | No | Empty → demo resource catalog |
+| `NEXT_PUBLIC_API_URL` | frontend | Yes in deployment | Public API origin; default `http://localhost:8000`. Baked in at build time |
 
 ## Testing
 
-Backend tests create a temporary SQLite file, run `alembic upgrade head`, and do not call OpenAI or Tavily. The worker test uses fakeredis.
-
-```bash
+```powershell
 cd backend
-ruff check app tests alembic
-pytest
-```
+.\.venv\Scripts\python -m ruff check app tests
+.\.venv\Scripts\python -m pytest -q
 
-Frontend:
-
-```bash
-cd frontend
+cd ..\frontend
 npm run lint
 npm run typecheck
 npm test
 npm run build
 ```
 
-`npm test` runs Vitest on the completion helper. It checks that an empty task list is 0 percent and that a missing skill is labelled “Not reported”, not as a verified failure.
+Backend tests use a temporary SQLite file, apply the Alembic migration, use fakeredis and the in-process RQ worker, and never call OpenAI or Tavily. They cover signup/login, email normalization, duplicate and concurrent-duplicate signup, password length limits, token expiry, protected routes, profile saving, assessment job creation, worker execution, persistence, ownership checks, task updates, and the gap rubric. Vitest covers the progress helpers, API error formatting, and form validation. `scripts/smoke_journey.py` (via `verify.ps1`/`verify.sh`) runs the full signup → queue → worker → complete task flow against your real Postgres and Redis.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on push and pull request.
+`.github/workflows/ci.yml` runs on every push and pull request:
 
-- Backend: Python 3.12, install `backend/requirements.txt`, Ruff, pytest.
-- Frontend: Node 22, `npm ci`, lint, `tsc --noEmit`, Vitest, production build with `NEXT_PUBLIC_API_URL=http://localhost:8000`.
+- **backend**: Python 3.12, `pip install -r requirements.txt`, `ruff check app tests`, `python -m pytest -q`
+- **frontend**: Node 22, `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`
+- **compose**: `docker compose --profile app config --quiet`
 
-CI does not use paid API credentials or a Postgres service. The migration is executed against SQLite inside pytest.
+No paid API keys or database services are required.
 
 ## Deployment
 
-This repository has not been deployed. Nothing here is a public URL.
+Nothing is deployed from this repository; you do it with your own accounts. Provision PostgreSQL and Redis first, then:
 
-A practical layout, using accounts you create yourself:
-
-| Piece | Suggested host | Start command |
+| Piece | Host | Settings |
 | --- | --- | --- |
-| Frontend | Vercel | Set `NEXT_PUBLIC_API_URL` to the public API origin. |
-| API | Render web service | `pip install -r requirements.txt && alembic upgrade head`, then `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. See `render.yaml`. |
-| Worker | Render background worker | `python -m app.worker`. |
-| PostgreSQL | Neon or another Postgres | Put the SQLAlchemy URL in `DATABASE_URL`. |
-| Redis | Upstash or another Redis | Put the URL in `REDIS_URL`. |
+| API | Render web service (see `render.yaml`) | root `backend`; build `pip install -r requirements.txt && alembic upgrade head`; start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`; health check `/api/v1/health` |
+| Worker | Render background worker | root `backend`; build `pip install -r requirements.txt`; start `python -m app.worker` |
+| Frontend | Vercel | root directory `frontend`; env `NEXT_PUBLIC_API_URL=https://<your-api>.onrender.com` |
+| PostgreSQL | Render Postgres / Neon / Supabase | set `DATABASE_URL` on API **and** worker |
+| Redis | Render Key Value / Upstash | set `REDIS_URL` on API **and** worker (Upstash: use the `rediss://` URL) |
 
-Also set `APP_ENV=production`, a long `JWT_SECRET`, and `CORS_ORIGINS` to the frontend origin. Point the host health check at `/api/v1/health`.
+API and worker environment: `APP_ENV=production`, `JWT_SECRET` (long random; same on both), `DATABASE_URL`, `REDIS_URL`, optional `OPENAI_API_KEY` / `TAVILY_API_KEY`. API only: `CORS_ORIGINS=https://<your-app>.vercel.app`. After deploying, check `https://<api>/api/v1/health/ready`, then replace the marker at the top of this README with the real URL.
 
-## Known limitations
+## GitHub and deployment
 
-- Clerk is not connected.
-- Without `TAVILY_API_KEY`, resources are the demo catalog. They are real URLs and are labelled demo.
-- Without a successful OpenAI call, the summary is template text labelled `demo`. Scores still come from the rubric.
-- Skill levels are self-reported. The product does not test or certify ability.
-- There is no resume parsing, interview practice, mentoring, calendar, or vector search.
-- The Windows worker does not enforce RQ’s Unix job timeout.
-- Screenshot files are not in the repository.
-- Git history may be empty until you commit. This tree has not been pushed.
+```powershell
+git remote add origin https://github.com/<you>/careerpilot-ai.git
+git branch -M main
+git push -u origin main
+```
 
-## Future improvements
+Create the empty public repository on GitHub first (no README/license, so the push is a plain fast-forward). Then import the repo into Vercel (root `frontend`) and Render (Blueprint from `render.yaml`).
 
-- Run one live Tavily query and one live narrative with real keys and compare them with the demo path.
-- Add email verification and refresh tokens.
-- Add RAG only after there is a private corpus, such as notes or a syllabus.
-- Deploy the four services and record the verified URLs in this README.
+## Key engineering decisions
 
-## Further reading
+| Decision | Why |
+| --- | --- |
+| Separate worker process | Scoring, search, and LLM calls are slow and can fail; the API stays fast and returns `202`. |
+| Redis + RQ | A small, readable queue that fits one job type; no broker or orchestration framework needed. |
+| Deterministic skill-gap scoring | Numbers must be reproducible, testable, and explainable. A model must not invent them. |
+| AI-generated narrative only | Prose is where a model adds value; its schema cannot add scores or links. |
+| Tavily discovery | Learning links are public and change; search returns real URLs with attribution. |
+| Labelled fallback catalog | The product works with no keys, and the UI never presents demo data as live. |
+| JWT + bcrypt | Simple, stateless, testable; no third-party auth dependency for an MVP. |
+| PostgreSQL | Relational ownership (`user_id` everywhere), constraints, and migrations. |
+| Single App Router tree | `frontend/src/app` only; duplicate trees silently shadow each other in Next.js. |
 
-- `docs/PRD.md` — scope and non-goals
-- `docs/ARCHITECTURE.md` — process boundaries
-- `docs/AI_ENGINEERING_DECISIONS.md` — rubric, search, and untrusted pages
-- `docs/DATA_MODEL.md` — tables and ownership
-- `docs/TESTING_STRATEGY.md` — what the automated tests cover
-- `docs/DECISION_LOG.md` — why this shape was chosen
+## Current limitations
+
+- Skill levels are self-reported; nothing is verified or certified.
+- Without keys, resources are a fixed catalog and the narrative is a template (both labelled `demo`).
+- Role rubrics cover a fixed set of careers; unknown roles use the software-engineer rubric.
+- The token is stored in `localStorage` (acceptable for an MVP; httpOnly cookies would be stronger).
+- No email verification, password reset, or refresh tokens.
+- The Windows worker does not enforce RQ's job timeout.
+- Not deployed; no screenshots are committed.
+
+## Documentation
+
+`docs/PRD.md` · `docs/ARCHITECTURE.md` · `docs/IMPLEMENTATION_PLAN.md` · `docs/AI_ENGINEERING_DECISIONS.md` · `docs/DATA_MODEL.md` · `docs/DECISION_LOG.md` · `docs/TESTING_STRATEGY.md`

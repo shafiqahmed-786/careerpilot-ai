@@ -31,6 +31,12 @@ Each resource row stores title, URL, domain, snippet, skill, provider (`tavily` 
 
 Snippets are truncated and placed inside `<untrusted_page>` tags. The system prompt tells the model to treat that text as data and to ignore instructions inside it. Only `https` URLs are kept. A unit test checks that extra JSON fields such as `url` and `instruction` are dropped by the narrative schema.
 
+## Failure behaviour
+
+- OpenAI missing, invalid output, or any error: the template narrative is stored with `provider=demo`; the job still completes.
+- Tavily missing, erroring, or returning no usable `https` results: the demo catalog is used for that skill and labelled `demo`.
+- Resource discovery and the roadmap use the same focus-skill list (`focus_skills`), so every roadmap task has resources.
+
 ## Providers
 
 - LLM: OpenAI Chat Completions when `OPENAI_API_KEY` is set. Otherwise the template.

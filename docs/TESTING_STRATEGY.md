@@ -1,27 +1,29 @@
 # Testing strategy
 
-Tests cover the path a reviewer will ask about. They do not try to exhaust the UI.
+Goal: a reliable MVP, not a large framework. External services are never required.
 
-## Backend
+## Backend (pytest, `cd backend && python -m pytest -q`)
 
-`backend/tests` uses a temporary SQLite file. `conftest.py` points `DATABASE_URL` at that file and runs `alembic upgrade head`, then asserts the eight tables exist.
+- Settings: temporary SQLite database, `alembic upgrade head` is executed once per session and the expected tables are asserted. OpenAI and Tavily keys are empty, so the demo paths run.
+- `test_auth.py`: signup/login, email normalization, duplicate and simulated concurrent duplicate (`409`), invalid emails, short/blank/over-72-byte passwords, byte-limit boundary, unknown user, invalid and expired tokens, hashing helpers, readiness (database + migrations), CORS for another localhost port.
+- `test_api.py`: health, `me`, profile + protected route, and the full journey with fakeredis: create job → worker (`SimpleWorker`, burst) → job `completed` → assessment, resources (all `demo`, all `https`), roadmap → ownership checks (`404` for another user) → task update → dashboard reflects it, including `latest_job`.
+- `test_gaps.py`, `test_schemas.py`, `test_search.py`: rubric arithmetic and statuses, narrative schema drops extra fields, demo resources.
+- `scripts/smoke_journey.py`: the same journey against your real Postgres and Redis (`scripts/verify.ps1` / `verify.sh`).
 
-Covered:
+Lint: `ruff check app tests`.
 
-- Signup, login, wrong password, and unauthenticated profile access.
-- Profile save.
-- A fakeredis RQ worker that persists an assessment and roadmap.
-- A second user receives 404 for the first user's job and task.
-- Gap math, including the `postgres` → SQL alias, and the "not a verified score" wording.
-- Narrative schema bounds and ignored injection fields.
-- Demo resources are `https` links and say they are not live search.
+## Frontend (`cd frontend`)
 
-External AI and search clients are not called. Empty keys force demo mode.
+- `npm run lint`, `npm run typecheck`, `npm test` (Vitest: progress helpers, API error formatting, form validation), `npm run build`.
 
-## Frontend
+## Manual end-to-end check
 
-Vitest checks the completion helper and the labels that avoid calling a self-report "verified". `npm run build` typechecks the App Router pages.
+Run `scripts/dev.ps1`, sign up with a new email, save a profile, watch the dashboard move from queued to completed, open the roadmap, complete a task, add a note, refresh, and confirm the dashboard percentage. Stop the worker and confirm the "worker not running" hint appears for a queued job. Stop Redis and confirm the `503` message.
 
-## Not in CI
+## Not covered (known)
 
-Playwright, live OpenAI, and live Tavily. A manual smoke test is: sign up, save a profile, run the worker, open the roadmap, mark a task complete, refresh the dashboard.
+Browser-level tests, load tests, and live OpenAI/Tavily calls (they need keys and cost money).
+
+## CI
+
+GitHub Actions runs backend lint + tests, frontend lint + typecheck + tests + build, and `docker compose --profile app config --quiet`.

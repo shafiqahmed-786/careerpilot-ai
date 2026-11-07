@@ -1,22 +1,20 @@
-# Implementation record
+# Implementation plan
 
-The checked-in tree is the MVP. There was no existing CareerPilot checkout on this machine, so the application was built here rather than resumed from `/home/claude/careerpilot-ai`.
+Status reflects the repository contents. Items marked "owner" need your accounts.
 
-## Built
+| Phase | Work | Status |
+| --- | --- | --- |
+| 1. Foundation | Repo layout, FastAPI app, SQLAlchemy models, Alembic `0001_initial`, Docker Compose for PostgreSQL and Redis | Done |
+| 2. Authentication | Signup/login, bcrypt, JWT, protected routes, owner-scoped queries | Done |
+| 3. Profile and queue | Profile API, job table, Redis/RQ enqueue, separate worker | Done |
+| 4. Assessment pipeline | Gap rubric, role catalog, Tavily + demo catalog, OpenAI + template narrative, roadmap builder | Done |
+| 5. Frontend journey | Landing, signup, login, onboarding, dashboard, roadmap | Done |
+| 6. Stabilization | Email/password validation (72-byte rule), race-safe duplicate signup, API error handling, CORS and 500 handling, single App Router tree, dashboard job polling and retry, notes saving, readiness migrations check | Done |
+| 7. Tests and CI | Pytest, Vitest, GitHub Actions (backend, frontend, compose config) | Done; run locally to confirm on your machine |
+| 8. Local tooling | `scripts/setup`, `dev`, `verify` for PowerShell and Bash, smoke journey | Done |
+| 9. Publish | Create the public GitHub repo and push | Owner |
+| 10. Deploy | Vercel + Render + managed Postgres/Redis, then set the live URL in the README | Owner |
 
-- JWT auth, profile CRUD, and ownership checks.
-- Assessment jobs enqueued to Redis and consumed by a separate RQ worker.
-- Rubric scoring, demo or Tavily resources, demo or OpenAI narrative, and a persisted roadmap.
-- Dashboard and roadmap UI, including task status and notes.
-- Alembic's initial migration, pytest, Ruff, GitHub Actions, Docker Compose, and Render start commands.
+## Next after the MVP
 
-## Deliberately not built
-
-Resume upload, interview prep, mentoring, notifications, and a vector store.
-
-## Order of work
-
-1. Schema, auth, and the job queue.
-2. Scoring, search, narrative, and roadmap persistence.
-3. Screens that call those endpoints.
-4. Tests, lint, the production frontend build, and these docs.
+Email verification and password reset, refresh tokens or httpOnly cookies, more role rubrics, re-generating a roadmap while keeping completed tasks, RAG only if a private corpus (notes, syllabus) is added.
