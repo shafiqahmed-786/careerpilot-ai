@@ -422,28 +422,92 @@ Copy [`.env.example`](.env.example) to `.env` (read by the API, worker and Alemb
 
 ## Deployment
 
-Nothing in this repository has been deployed, and no deployed URL exists yet: `[Add deployed application URL after deployment]`. Four pieces must run separately:
+CareerPilot AI is deployed with a separately hosted frontend and backend, with production infrastructure supporting authentication, persistent data and asynchronous AI workflows.
 
-| Piece | Suggested host | Settings |
+### Live application
+
+| Component | Deployed URL |
+| --- | --- |
+| **Frontend** | [CareerPilot AI](https://frontend-two-sand-84.vercel.app/) |
+| **Backend API** | [Render API](https://careerpilot-ai-backend-6n55.onrender.com/) |
+| **API Documentation** | [Interactive Swagger UI](https://careerpilot-ai-backend-6n55.onrender.com/docs) |
+| **API Readiness** | [Health Check](https://careerpilot-ai-backend-6n55.onrender.com/api/v1/health/ready) |
+| **GitHub Repository** | [shafiqahmed-786/careerpilot-ai](https://github.com/shafiqahmed-786/careerpilot-ai) |
+
+### Production architecture
+
+```mermaid
+flowchart TB
+    U["Student / User"]
+    FE["Next.js Frontend<br/>Vercel"]
+    API["FastAPI Backend<br/>Render"]
+    DB[("PostgreSQL")]
+    R[("Redis")]
+    W["RQ Background Worker<br/>Render"]
+    AI["OpenAI API"]
+    T["Tavily Search API"]
+
+    U --> FE
+    FE -->|"HTTPS / REST API"| API
+    API --> DB
+    API --> R
+    R --> W
+    W --> DB
+    W --> AI
+    W --> T
+    API --> AI
+```
+
+### Deployment components
+
+| Component | Platform | Responsibility |
 | --- | --- | --- |
-| Frontend | Vercel | Root directory `frontend`; `NEXT_PUBLIC_API_URL=https://<api-host>` |
-| API | Render web service ([`render.yaml`](render.yaml)) | Root `backend`; build `pip install -r requirements.txt && alembic upgrade head`; start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`; **health check path `/api/v1/health`** |
-| Worker | Render background worker (in `render.yaml`) | Root `backend`; start `python -m app.worker`. **Required**: assessments, roadmap adaptation and resume analysis stay queued without it |
-| PostgreSQL, Redis | Render Postgres / Key Value, Neon, Supabase, Upstash | Same `DATABASE_URL` and `REDIS_URL` on **both** API and worker (Upstash: `rediss://`) |
+| Frontend | Vercel | Next.js application, user interface and client-side navigation |
+| Backend API | Render | FastAPI endpoints, authentication, business logic and API orchestration |
+| Background worker | Render | Asynchronous assessments, roadmap adaptation and resume analysis |
+| Database | PostgreSQL | User accounts, profiles, assessments, roadmaps, conversations and application data |
+| Queue | Redis + RQ | Background job scheduling and execution |
+| Generative AI | OpenAI | Personalized roadmap generation, resume analysis and contextual mentorship |
+| Resource discovery | Tavily | Live discovery of relevant learning resources |
 
-Production environment: `APP_ENV=production`; `JWT_SECRET` (long random, identical on API and worker); `DATABASE_URL`; `REDIS_URL`; API-only `CORS_ORIGINS=https://<your-frontend>`; optional `OPENAI_API_KEY`, `TAVILY_API_KEY` on both services. After deploying, open `https://<api-host>/api/v1/health/ready`: `database`, `migrations` and `redis` should be `true`. Then fill in the placeholders at the top of this file.
+### Production configuration
 
-To publish: create an empty public repository (no README or license), then `git remote add origin <url>` and `git push -u origin main`.
+The frontend communicates with the backend through `NEXT_PUBLIC_API_URL`, configured with the deployed API origin.
 
-## Current limitations
+The backend uses the following environment configuration:
 
-- Skill levels are self-reported; neither the rubric score nor evidence coverage is a verified measure of ability or a hiring signal.
-- Without keys, the narrative and roadmap are templates and resources come from a fixed catalog (all labelled `demo`). Live OpenAI and Tavily behavior is covered by mocks, not by live calls in the test suite.
-- The role rubric covers nine roles; the adaptation rule (6 completed hours = +1 planning level) is a transparent heuristic.
-- Mentor replies are not streamed; scanned (image-only) resumes are unsupported (no OCR); resume text is truncated to 20,000 characters (12,000 sent to the model).
-- Auth: token in `localStorage`; no refresh tokens, email verification or password reset.
-- The Windows worker does not enforce RQ's job timeout.
-- No screenshots, deployment or verified CI run exist yet (see [Testing](#testing-and-verification-status)).
+| Variable | Purpose |
+| --- | --- |
+| `APP_ENV` | Production environment |
+| `JWT_SECRET` | Secure JWT signing |
+| `JWT_EXPIRE_MINUTES` | Token expiration |
+| `DATABASE_URL` | PostgreSQL connection |
+| `REDIS_URL` | Redis connection |
+| `CORS_ORIGINS` | Authorized frontend origin |
+| `OPENAI_API_KEY` | Enables live generative AI functionality |
+| `OPENAI_MODEL` | Configured OpenAI model |
+| `TAVILY_API_KEY` | Enables live learning-resource discovery |
+
+Secrets are configured through hosting-provider environment settings and are not committed to Git.
+
+### Deployment verification
+
+The backend exposes dedicated health endpoints:
+
+- `/api/v1/health` — API liveness.
+- `/api/v1/health/ready` — readiness checks for database, migrations and Redis.
+
+The readiness endpoint is used to verify infrastructure dependencies rather than relying solely on the API process starting successfully.
+
+The background worker must remain operational for queued assessments, roadmap adaptation and resume analysis to complete.
+
+### Local and production deployment
+
+The project supports local development through Docker Compose and the supplied setup scripts. Production deployment separates the frontend, API, worker and supporting infrastructure to allow independent scaling and configuration.
+
+See [render.yaml](render.yaml), [Docker Compose](docker-compose.yml), and the [Environment Variables](#environment-variables) section for configuration details.
+
+- Production deployment is available through Vercel and Render. Infrastructure readiness and background-worker execution should be verified independently; see [Deployment](#deployment). Screenshots are maintained separately in `docs/screenshots/` when available. CI verification status is documented in [Testing and Verification Status](#testing-and-verification-status).
 
 ## Documentation
 
