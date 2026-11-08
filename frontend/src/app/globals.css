@@ -2,15 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ─── Dark theme (default) ─────────────────────────────────────────────────── */
+:root,
+.dark {
   color-scheme: dark;
+
+  /* RGB channels — used by Tailwind's opacity modifiers (bg-accent/10 etc.) */
+  --color-ink-rgb:     232, 234, 238;
+  --color-paper-rgb:   9,   11,  15;
+  --color-surface-rgb: 16,  19,  26;
+  --color-raised-rgb:  22,  26,  35;
+  --color-line-rgb:    35,  40,  51;
+  --color-muted-rgb:   138, 147, 163;
+  --color-accent-rgb:  124, 139, 255;
+  --color-good-rgb:    74,  222, 128;
+  --color-warn-rgb:    251, 191, 36;
+  --color-bad-rgb:     248, 113, 113;
+
+  --body-gradient: radial-gradient(60rem 30rem at 50% -10%, rgba(124,139,255,0.08), transparent 70%);
+  --skeleton-bg:   #161a23;
+  --skeleton-shim: rgba(255,255,255,0.05);
+  --select-bg:     #10131a;
 }
 
+/* ─── Light theme ───────────────────────────────────────────────────────────── */
+.light {
+  color-scheme: light;
+
+  --color-ink-rgb:     15,  17,  23;
+  --color-paper-rgb:   245, 246, 250;
+  --color-surface-rgb: 255, 255, 255;
+  --color-raised-rgb:  240, 241, 247;
+  --color-line-rgb:    225, 228, 237;
+  --color-muted-rgb:   107, 114, 128;
+  --color-accent-rgb:  92,  110, 248;
+  --color-good-rgb:    22,  163, 74;
+  --color-warn-rgb:    217, 119, 6;
+  --color-bad-rgb:     220, 38,  38;
+
+  --body-gradient: radial-gradient(60rem 30rem at 50% -10%, rgba(92,110,248,0.05), transparent 70%);
+  --skeleton-bg:   #e8eaef;
+  --skeleton-shim: rgba(255,255,255,0.7);
+  --select-bg:     #ffffff;
+}
+
+/* ─── Base styles ───────────────────────────────────────────────────────────── */
 body {
-  background: #090b0f;
-  background-image: radial-gradient(60rem 30rem at 50% -10%, rgba(124, 139, 255, 0.08), transparent 70%);
+  background-color: rgb(var(--color-paper-rgb));
+  background-image: var(--body-gradient);
   background-repeat: no-repeat;
-  color: #e8eaee;
+  color: rgb(var(--color-ink-rgb));
 }
 
 input,
@@ -21,19 +62,20 @@ button {
 }
 
 select option {
-  background: #10131a;
-  color: #e8eaee;
+  background: var(--select-bg);
+  color: rgb(var(--color-ink-rgb));
 }
 
 :focus-visible {
-  outline: 2px solid #7c8bff;
+  outline: 2px solid rgb(var(--color-accent-rgb));
   outline-offset: 2px;
 }
 
+/* ─── Skeleton loader ───────────────────────────────────────────────────────── */
 .skeleton {
   position: relative;
   overflow: hidden;
-  background: #161a23;
+  background: var(--skeleton-bg);
   border-radius: 0.5rem;
 }
 
@@ -42,8 +84,14 @@ select option {
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  background: linear-gradient(90deg, transparent, var(--skeleton-shim), transparent);
   animation: shimmer 1.4s infinite;
+}
+
+/* ─── Smooth theme transitions (added by ThemeProvider after first paint) ──── */
+.theme-ready,
+.theme-ready * {
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, fill 0.18s ease, stroke 0.18s ease !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

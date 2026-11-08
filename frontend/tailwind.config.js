@@ -1,23 +1,26 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        ink: "#e8eaee",
-        paper: "#090b0f",
-        surface: "#10131a",
-        raised: "#161a23",
-        line: "#232833",
-        muted: "#8a93a3",
-        accent: "#7c8bff",
-        good: "#4ade80",
-        warn: "#fbbf24",
-        bad: "#f87171",
+        // Each color is defined as an RGB channel variable so Tailwind's
+        // opacity modifiers (e.g. bg-accent/10) work correctly.
+        ink:     ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-ink-rgb), ${opacityValue})` : "rgb(var(--color-ink-rgb))",
+        paper:   ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-paper-rgb), ${opacityValue})` : "rgb(var(--color-paper-rgb))",
+        surface: ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-surface-rgb), ${opacityValue})` : "rgb(var(--color-surface-rgb))",
+        raised:  ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-raised-rgb), ${opacityValue})` : "rgb(var(--color-raised-rgb))",
+        line:    ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-line-rgb), ${opacityValue})` : "rgb(var(--color-line-rgb))",
+        muted:   ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-muted-rgb), ${opacityValue})` : "rgb(var(--color-muted-rgb))",
+        accent:  ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-accent-rgb), ${opacityValue})` : "rgb(var(--color-accent-rgb))",
+        good:    ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-good-rgb), ${opacityValue})` : "rgb(var(--color-good-rgb))",
+        warn:    ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-warn-rgb), ${opacityValue})` : "rgb(var(--color-warn-rgb))",
+        bad:     ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-bad-rgb), ${opacityValue})` : "rgb(var(--color-bad-rgb))",
         // aliases kept so older class names do not break
-        card: "#10131a",
-        moss: "#7c8bff",
-        clay: "#f87171",
+        card: ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-surface-rgb), ${opacityValue})` : "rgb(var(--color-surface-rgb))",
+        moss: ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-accent-rgb), ${opacityValue})` : "rgb(var(--color-accent-rgb))",
+        clay: ({ opacityValue }) => opacityValue !== undefined ? `rgba(var(--color-bad-rgb), ${opacityValue})` : "rgb(var(--color-bad-rgb))",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],

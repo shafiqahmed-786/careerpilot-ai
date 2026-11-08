@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { ErrorNote, btnPrimary, inputClass } from "@/components/ui";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, setToken } from "@/lib/api";
 import { emailProblem, passwordProblem } from "@/lib/validation";
 
@@ -40,10 +41,13 @@ export default function SignupPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5">
-      <Link className="mb-8 flex items-center gap-2" href="/">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-[#0b0d14]">C</span>
-        <span className="font-semibold">CareerPilot AI</span>
-      </Link>
+      <div className="mb-8 flex items-center justify-between">
+        <Link className="flex items-center gap-2" href="/">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-[#0b0d14]">C</span>
+          <span className="font-semibold">CareerPilot AI</span>
+        </Link>
+        <ThemeToggle />
+      </div>
       <h1 className="text-2xl font-semibold tracking-tight">Create your account</h1>
       <form className="mt-6 space-y-4" noValidate onSubmit={onSubmit}>
         <label className="block text-sm">

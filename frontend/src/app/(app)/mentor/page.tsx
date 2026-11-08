@@ -32,7 +32,7 @@ export default function MentorPage() {
     if (q) setText(q);
   }, [refreshList]);
 
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [messages, busy]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages, busy]);
 
   async function open(id: string) {
     setError("");

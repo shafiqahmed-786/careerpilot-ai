@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const layers = [
   { n: "01", title: "Understand", text: "Profile, projects and resume are analyzed. Skills count as demonstrated only when your resume shows them used." },
@@ -14,7 +17,8 @@ export default function HomePage() {
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-[#0b0d14]">C</span>
           <span className="font-semibold">CareerPilot AI</span>
         </span>
-        <nav className="flex gap-3 text-sm">
+        <nav className="flex items-center gap-2 text-sm">
+          <ThemeToggle />
           <Link className="rounded-lg px-3 py-1.5 text-muted hover:text-ink" href="/login">Sign in</Link>
           <Link className="rounded-lg bg-accent px-3 py-1.5 font-medium text-[#0b0d14]" href="/signup">Get started</Link>
         </nav>
