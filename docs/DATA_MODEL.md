@@ -25,3 +25,17 @@ erDiagram
 | `roadmap_tasks` | `roadmap_id`, `user_id`, `week_number`, `objective`, `skills`, `title`, `details`, `estimated_hours`, `expected_outcome`, `completion_criteria`, `resources` (JSON), `status`, `notes`, `sort_order`, `completed_at` | Unique `(roadmap_id, sort_order)`; `status`: `pending`, `in_progress`, `completed` |
 
 `user_id` is stored on every owned table so queries reject another user's ids without a join. Completion percentage is `round(completed_tasks * 100 / total_tasks)`, computed by the API and never stored.
+
+## v2 tables and columns (migration `0002_ai_features`)
+
+| Table / column | Notes |
+| --- | --- |
+| `assessment_jobs.kind`, `params` | `assessment` / `adapt` / `resume`; JSON parameters (adapt mode and focus skill, resume id) |
+| `roadmaps.source` | `ai` or `fallback` |
+| `roadmaps.milestones` | JSON list of `{week, title}` |
+| `roadmaps.adapted_count`, `adaptation_note` | Revision history summary |
+| `mentor_conversations` | `user_id`, `title`, `created_at`, `updated_at` |
+| `mentor_messages` | `conversation_id`, `user_id`, `role` (`user`/`assistant`), `content`, `provider` (`openai`/`demo`), `notice`, `created_at` |
+| `resume_analyses` | `user_id`, `filename`, `status`, `provider`, `notice`, `error`, `source_text` (cleared after analysis), `analysis` (JSON), `comparison` (JSON), `created_at` |
+
+All new tables carry `user_id`; every query filters by it and foreign ids return `404`.

@@ -48,6 +48,8 @@ export type Assessment = {
   resources: Resource[];
 };
 
+export type TaskResource = { title: string; url: string; domain?: string; provider?: string };
+
 export type Task = {
   id: string;
   week_number: number;
@@ -58,10 +60,11 @@ export type Task = {
   estimated_hours: number;
   expected_outcome: string;
   completion_criteria: string;
-  resources: { title: string; url: string; domain?: string; provider?: string }[];
+  resources: TaskResource[];
   status: string;
   notes: string;
   sort_order: number;
+  completed_at: string | null;
 };
 
 export type Roadmap = {
@@ -71,12 +74,17 @@ export type Roadmap = {
   weekly_hours: number;
   overview: string;
   provider: string;
+  source: string;
+  milestones: { week: number; title: string }[];
+  adapted_count: number;
+  adaptation_note: string | null;
   completion_percent: number;
   tasks: Task[];
 };
 
 export type Job = {
   id: string;
+  kind: string;
   status: string;
   error: string | null;
   assessment_id: string | null;
@@ -84,8 +92,28 @@ export type Job = {
   created_at: string;
 };
 
+export type ActivityDay = { date: string; count: number };
+
+export type ResumeSummary = {
+  id: string;
+  status: string;
+  provider: string | null;
+  match_percent: number | null;
+  skills_found: number;
+  created_at: string;
+};
+
 export type Dashboard = {
   latest_job: Job | null;
+  readiness_percent: number | null;
+  skills_identified: number;
+  critical_gaps: number;
+  milestones_completed: number;
+  milestones_total: number;
+  streak_days: number;
+  activity: ActivityDay[];
+  competencies: Competency[];
+  resume: ResumeSummary | null;
   profile: Profile | null;
   assessment: Assessment | null;
   roadmap: Roadmap | null;
@@ -94,6 +122,74 @@ export type Dashboard = {
   recently_completed: Task[];
   top_gaps: Competency[];
   resources: Resource[];
+};
+
+export type MentorMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  provider: string | null;
+  notice: string | null;
+  created_at: string;
+};
+
+export type ConversationSummary = { id: string; title: string; created_at: string; updated_at: string };
+export type ConversationDetail = ConversationSummary & { messages: MentorMessage[] };
+export type MentorStatus = {
+  mode: "openai" | "demo";
+  model: string | null;
+  has_profile: boolean;
+  has_roadmap: boolean;
+  has_resume: boolean;
+};
+
+export type SkillEvidence = {
+  name: string;
+  category: string;
+  evidence_level: "demonstrated" | "listed" | "inferred";
+  evidence: string[];
+  confidence: "high" | "medium" | "low";
+};
+
+export type ResumeAnalysisData = {
+  overview: string;
+  education: string[];
+  experience: string[];
+  projects: { name: string; summary: string; technologies: string[] }[];
+  skills: SkillEvidence[];
+  achievements: string[];
+  strengths: string[];
+  improvements: string[];
+  potential_gaps: string[];
+  recommended_projects: string[];
+};
+
+export type ResumeComparison = {
+  target_role: string;
+  evidence_coverage_percent: number;
+  formula: string;
+  summary: string;
+  competencies: {
+    name: string;
+    importance: number;
+    status: "demonstrated" | "listed" | "inferred" | "missing";
+    evidence: string[];
+    why_it_matters: string;
+  }[];
+  priorities: string[];
+  recommended_projects: string[];
+};
+
+export type ResumeResult = {
+  id: string;
+  filename: string;
+  status: string;
+  provider: string | null;
+  notice: string | null;
+  error: string | null;
+  created_at: string;
+  analysis: ResumeAnalysisData | null;
+  comparison: ResumeComparison | null;
 };
 
 const TOKEN_KEY = "careerpilot_token";
@@ -173,7 +269,7 @@ export function networkMessage(base: string): string {
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
-  if (!headers.has("Content-Type") && options.body) {
+  if (!headers.has("Content-Type") && typeof options.body === "string") {
     headers.set("Content-Type", "application/json");
   }
   const token = getToken();

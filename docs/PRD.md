@@ -50,3 +50,17 @@ Resume parsing, interview practice, social features, mentoring, calendars, advan
 ## Success
 
 A newly registered user can go from an empty profile to a stored roadmap and see the dashboard change after completing a task, with the worker in a separate process, with or without OpenAI and Tavily keys.
+
+## v2 additions
+
+| Feature | Scope |
+| --- | --- |
+| AI Career Mentor | Route `/mentor`; persistent conversations; answers use the user's profile, gaps, roadmap progress and resume evidence; explicit live/demo labelling |
+| AI roadmap | LLM-written weekly plan validated against a schema; deterministic fallback; source recorded on the roadmap |
+| Adaptive plan | Explicit revise / intensive / lighter / focus actions; completed history preserved |
+| Resume Analyzer | Route `/resume-analyzer`; PDF/DOCX; evidence-based skills; deterministic role comparison; apply to profile |
+| Application shell and dashboard | Sidebar navigation, real metrics (progress, skills, gaps, milestones, streak, activity, readiness) |
+
+Out of scope for v2: resume editor, job applications, OCR, streaming replies, vector search, multi-agent orchestration.
+
+Honesty rules extend to the new features: resume keywords are not proof of skill; demo outputs are labelled; no LLM-generated percentages; no invented URLs.

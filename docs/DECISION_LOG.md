@@ -21,3 +21,18 @@
 | SQLite in pytest, PostgreSQL elsewhere | Tests need no database service; the migration uses portable types. |
 | String UUID primary keys | Same ids on SQLite and PostgreSQL. |
 | No push, no deployment from the build environment | The owner creates the GitHub repository and deploys. |
+
+## v2 decisions
+
+| Decision | Reason |
+| --- | --- |
+| Mentor replies inside the request, not the queue | Chat must feel responsive; a 40 s timeout and a labelled fallback bound the wait |
+| Roadmap, adaptation and resume analysis through RQ | Slow, retryable operations; reuses the existing worker and job table via `kind` |
+| No streaming | Simpler and testable; typing indicator covers the wait |
+| `pypdf` + stdlib `zipfile`, no DOCX library | Smallest dependency set; DOCX text read with regexes avoids XML-bomb parsing |
+| Upload parsed in memory, text kept until analysis ends | Raw files are never stored; text is cleared after the worker finishes |
+| Evidence quotes verified against the resume | A model must not be able to assert evidence that is not there |
+| Resume match is a formula, labelled "evidence coverage" | Reproducible number; no LLM percentage |
+| Adapt deletes only `pending` tasks | Preserves completed history and in-progress work |
+| Dark design system in Tailwind, no component library | Requested visual direction without new dependencies |
+| `(app)` route group with one `AppShell` | Single auth gate, sidebar and transitions for all authenticated pages |

@@ -1,25 +1,19 @@
 import type { Metadata } from "next";
-import { Outfit, Source_Serif_4 } from "next/font/google";
-
-import { AppHeader } from "@/components/AppHeader";
+import { Inter } from "next/font/google";
 
 import "./globals.css";
 
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
-const sourceSerif = Source_Serif_4({ subsets: ["latin"], variable: "--font-serif" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "CareerPilot AI",
-  description: "Your career goal. A personalized roadmap. Measurable progress.",
+  description: "AI career intelligence: understand your skills, plan your learning, get mentored as you progress.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${outfit.variable} ${sourceSerif.variable} font-sans antialiased`}>
-        <AppHeader />
-        {children}
-      </body>
+      <body className={`${inter.variable} font-sans antialiased`}>{children}</body>
     </html>
   );
 }

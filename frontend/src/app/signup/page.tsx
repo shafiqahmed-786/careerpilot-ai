@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import { ErrorNote, btnPrimary, inputClass } from "@/components/ui";
 import { api, setToken } from "@/lib/api";
 import { emailProblem, passwordProblem } from "@/lib/validation";
 
@@ -38,46 +39,26 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md px-5 py-16">
-      <h1 className="font-serif text-4xl">Create your account</h1>
-      <p className="mt-2 text-muted">Passwords are hashed. Sessions use a signed token that expires.</p>
-      <form className="mt-8 space-y-4" noValidate onSubmit={onSubmit}>
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5">
+      <Link className="mb-8 flex items-center gap-2" href="/">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-[#0b0d14]">C</span>
+        <span className="font-semibold">CareerPilot AI</span>
+      </Link>
+      <h1 className="text-2xl font-semibold tracking-tight">Create your account</h1>
+      <form className="mt-6 space-y-4" noValidate onSubmit={onSubmit}>
         <label className="block text-sm">
           Email
-          <input
-            autoComplete="email"
-            className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2"
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            type="email"
-            value={email}
-          />
+          <input autoComplete="email" className={`${inputClass} mt-1`} onChange={(e) => setEmail(e.target.value)} required type="email" value={email} />
         </label>
         <label className="block text-sm">
           Password
-          <input
-            autoComplete="new-password"
-            className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2"
-            minLength={8}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            type="password"
-            value={password}
-          />
+          <input autoComplete="new-password" className={`${inputClass} mt-1`} onChange={(e) => setPassword(e.target.value)} required type="password" value={password} />
           <span className="mt-1 block text-xs text-muted">At least 8 characters, at most 72 bytes.</span>
         </label>
-        {error ? (
-          <p className="text-sm text-clay" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <button className="w-full rounded-full bg-moss py-2.5 text-white disabled:opacity-60" disabled={pending} type="submit">
-          {pending ? "Creating account…" : "Continue to profile"}
-        </button>
+        <ErrorNote message={error} />
+        <button className={`${btnPrimary} w-full`} disabled={pending} type="submit">{pending ? "Creating account…" : "Create account"}</button>
       </form>
-      <p className="mt-4 text-sm text-muted">
-        Already registered? <Link className="text-moss" href="/login">Sign in</Link>
-      </p>
+      <p className="mt-6 text-sm text-muted">Already registered? <Link className="text-accent" href="/login">Sign in</Link></p>
     </main>
   );
 }

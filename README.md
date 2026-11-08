@@ -1,10 +1,16 @@
-# CareerPilot AI
+# CareerPilot AI 2.0
 
 **Your career goal. A personalized roadmap. Measurable progress.**
 
 > **Live demo:** _not deployed yet_ <!-- DEPLOYED_URL: after deploying, replace this line with: **Live demo:** https://YOUR-VERCEL-APP.vercel.app (API: https://YOUR-RENDER-API.onrender.com/api/v1/health) -->
 
-CareerPilot AI is an AI-powered career guidance and learning-roadmap platform for students and fresh graduates. A user enters a target career, current skills with self-reported proficiency, education, experience, and weekly availability. A **separate background worker** scores the skill gaps with a deterministic rubric, finds learning resources (Tavily live search, or a clearly labelled demo catalog), writes an AI-assisted explanation (OpenAI, or a labelled template), and saves a 4-, 8-, or 12-week roadmap. Progress is tracked per task in PostgreSQL.
+CareerPilot AI 2.0 is an **AI career intelligence and execution platform** for students and fresh graduates. It has three layers:
+
+1. **Understand**: a career profile plus an uploaded resume (PDF/DOCX). The resume analysis separates skills *demonstrated by project or experience evidence* from skills *merely listed* and skills *inferred with low confidence*, and checks every evidence quote against the real resume text.
+2. **Reason and plan**: a deterministic rubric scores skill gaps (priority = importance × gap). OpenAI then writes a personalized 4/8/12-week roadmap from those scores, the learner's hours, and verified resources. The output is validated against a strict schema; if it fails, a deterministic builder is used and the roadmap is labelled `fallback`.
+3. **Guide and adapt**: a context-aware **AI Career Mentor** with persistent conversations, and an explicit **adapt plan** action that re-plans only the unstarted tasks from actual progress (completed work is kept).
+
+Everything AI-generated is labelled with its real provider (`openai` or `demo`). With no keys set, every feature still works through deterministic fallbacks and says so in the UI.
 
 It is an independent project. It does not share code with RuFlow or MedResearch.
 
@@ -40,6 +46,11 @@ Naming a job is not a study plan. A student can say "backend engineer" and still
 | Resources | Tavily when `TAVILY_API_KEY` is set. Otherwise a labelled demo catalog of real public URLs. URLs are never invented. |
 | Roadmap | Weekly objectives, tasks, estimated hours, expected outcomes, completion criteria, resource links. |
 | Progress | Mark tasks pending / in progress / completed and keep notes. Survives refresh. The dashboard reads the same rows. |
+| AI Career Mentor (`/mentor`) | Persistent conversations. Each answer gets a compact context of *your* profile, top gaps, roadmap progress, delayed tasks and resume evidence, plus the last 8 messages. Live OpenAI or a clearly labelled template. |
+| AI roadmap | OpenAI writes weekly objectives, milestones, project-based tasks with measurable completion criteria; validated; falls back to the deterministic builder. |
+| Adaptive plan | Explicit actions: revise, more intensive, lighter, focus on one skill. Completed and in-progress tasks are preserved. |
+| Resume Analyzer (`/resume-analyzer`) | PDF/DOCX upload (5 MB), evidence-based skill classification, deterministic target-role comparison, apply skills to profile. |
+| Dashboard | Real metrics only: progress, skills identified, critical gaps, milestones, streak (from persisted completion timestamps), 14-day activity, readiness, next action. |
 | Resilience | Job states `queued → running → completed / failed` with clear UI messages, a retry button, and a hint when the worker is not running. |
 
 ## Screenshots
@@ -50,13 +61,14 @@ No screenshot files are committed. After you run the app, add captures to `docs/
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | Next.js 15 (App Router, single tree in `frontend/src/app`), React 19, TypeScript, Tailwind CSS |
+| Frontend | Next.js 15 (App Router, single tree in `frontend/src/app`; authenticated pages in the `(app)` route group with a sidebar shell), React 19, TypeScript, Tailwind CSS (dark design system, no component library) |
 | API | Python 3.12, FastAPI, Pydantic v2 |
 | Database | PostgreSQL 16, SQLAlchemy 2, Alembic |
 | Queue | Redis 7, RQ (separate worker process; Windows-compatible worker class) |
-| AI | OpenAI Chat Completions (optional, narrative only) |
+| AI | OpenAI Chat Completions via one small client (`app/llm.py`) with timeouts: mentor, roadmap, resume analysis, assessment narrative (all optional) |
 | Resource discovery | Tavily Search API (optional) with labelled fallback catalog |
 | Auth | bcrypt, PyJWT (HS256) |
+| Resume parsing | `pypdf` (PDF), stdlib `zipfile` (DOCX); files are never stored |
 | Tests | Pytest (+ fakeredis, SQLite-backed migration), Vitest |
 | CI | GitHub Actions |
 | Local services | Docker Compose (PostgreSQL, Redis; optional API + worker) |
@@ -109,7 +121,16 @@ The API never calls the model or the search provider. It records a job row, enqu
 | `GET` | `/api/v1/assessments/latest` | Yes | Latest assessment, competencies, resources |
 | `GET` | `/api/v1/roadmaps/current` | Yes | Latest roadmap and tasks |
 | `PATCH` | `/api/v1/tasks/{id}` | Yes | Update status and notes (owner only) |
-| `GET` | `/api/v1/dashboard` | Yes | Everything the dashboard needs, including `latest_job` |
+| `POST` | `/api/v1/roadmaps/current/adapt` | Yes | Queue a plan revision (`mode`: revise, intensive, lighter, focus + `focus_skill`) |
+| `GET` | `/api/v1/dashboard` | Yes | Metrics, charts data, `latest_job`, resume summary |
+| `GET` | `/api/v1/mentor/status` | Yes | Live vs demo mode and which context exists |
+| `POST` / `GET` | `/api/v1/mentor/conversations` | Yes | Create / list your conversations |
+| `GET` / `DELETE` | `/api/v1/mentor/conversations/{id}` | Yes | Read / delete (owner only, else `404`) |
+| `POST` | `/api/v1/mentor/conversations/{id}/messages` | Yes | Ask the mentor; returns the saved user and assistant messages |
+| `POST` | `/api/v1/resume/analyze` | Yes | Multipart upload (`file`); validates, extracts text, queues the analysis (`202`) |
+| `GET` | `/api/v1/resume/latest` | Yes | Latest analysis and role comparison |
+| `POST` | `/api/v1/resume/{id}/apply-to-profile` | Yes | Add detected skills to the profile (conservative levels, never overwrites) |
+| `DELETE` | `/api/v1/resume/{id}` | Yes | Delete an analysis |
 
 Interactive docs: `http://localhost:8000/docs`.
 
@@ -126,7 +147,12 @@ erDiagram
   assessments ||--o{ learning_resources : cites
   assessments ||--o| roadmaps : plans
   roadmaps ||--o{ roadmap_tasks : contains
+  users ||--o{ mentor_conversations : owns
+  mentor_conversations ||--o{ mentor_messages : holds
+  users ||--o{ resume_analyses : uploads
 ```
+
+`assessment_jobs.kind` (`assessment`, `adapt`, `resume`) lets one queue and one worker serve all expensive operations. `roadmaps` records `source` (`ai`/`fallback`), milestones and the adaptation history; `resume_analyses.source_text` holds extracted text only until the worker finishes and is then cleared.
 
 Completion percentage is not stored; it is computed from task rows (`round(completed × 100 / total)`).
 
@@ -138,7 +164,7 @@ Completion percentage is not stored; it is computed from task rows (`round(compl
 - Authorization: every handler derives the user from the token and filters by `user_id`. Another user's job or task returns `404`.
 - Production: the API refuses to start with the default JWT secret when `APP_ENV=production`.
 
-## AI integration and decision-making
+## AI integration and decision-making (assessment)
 
 - **Scores are deterministic.** `app/gaps.py` (rubric `importance-x-gap-v1`): `gap = max(0, target − self_reported)`, `priority = importance × gap`; `missing` = level 0, `improve` = below target, `sufficient` = at/above target. An LLM never produces or alters a number.
 - **AI writes prose only.** With `OPENAI_API_KEY`, the model rewrites `summary` and `learn_first_reason` from structured facts. Its output schema has no URL or score fields. On any failure the template narrative is stored and labelled `demo`.
@@ -148,15 +174,31 @@ Completion percentage is not stored; it is computed from task rows (`round(compl
 
 More detail: `docs/AI_ENGINEERING_DECISIONS.md`.
 
+## AI capabilities and deterministic boundaries
+
+| Responsibility | Done by |
+| --- | --- |
+| Competency importance, targets, self-reported levels, priority scores, gap status, readiness and resume match numbers, streaks, authorization, validation | **Python** (deterministic, tested) |
+| Assessment narrative, roadmap text (objectives, tasks, criteria, milestones), resume skill/evidence extraction, mentor answers | **OpenAI** (optional), validated before use |
+| Learning links | **Tavily** or the verified demo catalog. Model-supplied URLs not in that list are discarded |
+
+**AI Career Mentor.** `app/mentor.py` builds a compact, user-scoped context (every query filtered by `user.id`): profile and self-reported skills, top gaps, rubric coverage, roadmap progress, next tasks, skipped tasks, resume evidence. It is injected inside `<user_context>` tags with rules to treat it as data, to never claim verified skills, and to point to the app when data is missing. History is bounded to 8 messages. Messages are stored in PostgreSQL with the provider that produced them. If the key is missing or the call fails, a template answer built from the same context is returned, ends with an explicit "Demo mode" note, and is stored with `provider = demo`. Replies are not streamed; the UI shows a typing indicator.
+
+**AI roadmap and adaptation.** `app/roadmap_ai.py` sends the deterministic gaps, hour budget, week range, verified resources, resume evidence and (when adapting) progress to the model, then validates: exact week numbers, per-week hours within 50-125% of the budget, only known skills, no vague titles, resource URLs limited to the provided list. Any failure falls back to `build_tasks`. `app/adaptive.py` adds progress evidence (every 6 completed hours on a skill raise its *planning* level by one, capped at the target) to re-rank focus skills; the stored assessment is never modified. Adapting deletes only `pending` tasks and keeps `completed` and `in_progress` ones.
+
+**Resume intelligence.** Upload checks: extension, content type, magic bytes (`%PDF-`, `PK`), 5 MB, PDF page cap, encrypted/corrupt/empty/scanned documents rejected with clear messages; DOCX is read with regexes (no XML parser, zip-bomb size check). Resume text is untrusted: it is wrapped in `<resume>` tags and the prompt says to ignore instructions inside it. Evidence snippets from the model must appear verbatim in the resume or the skill is downgraded (`demonstrated` → `listed` → `inferred`). The role match is `sum(importance × points) / sum(importance)` with demonstrated = 1, listed = 0.5, otherwise 0; it is labelled "evidence coverage", not a hiring score. Without a key a keyword analysis runs and is labelled demo.
+
+**Cost and safety.** One call per mentor message, resume, roadmap and narrative; prompts carry summaries, not raw tables; every call has a timeout; prompts and responses are never logged.
+
 ## Background worker and Redis queue
 
-`POST /assessments` inserts an `assessment_jobs` row (`queued`), enqueues `app.worker.process_assessment_job` on queue `careerpilot`, and returns. The worker marks the job `running`, runs the pipeline, then `completed` (with `assessment_id` and `roadmap_id`) or `failed` (with an error). If Redis is unreachable the API marks the job `failed` and returns `503`.
+`POST /assessments` inserts an `assessment_jobs` row (`queued`), enqueues `app.worker.process_assessment_job` on queue `careerpilot`, and returns. The same queue also carries `adapt` and `resume` jobs (`assessment_jobs.kind`). The worker marks the job `running`, runs the pipeline, then `completed` (with `assessment_id` and `roadmap_id`) or `failed` (with an error). If Redis is unreachable the API marks the job `failed` and returns `503`.
 
 On Linux/macOS the worker is RQ's forking `Worker`. On Windows (no `fork`, no `SIGALRM`) it uses `WindowsWorker`, a `SimpleWorker` without the Unix timeout. It is still a separate process from the API.
 
 ## Local installation
 
-Prerequisites: Python 3.12, Node.js 22 + npm, Docker Desktop. No OpenAI or Tavily key is needed for the demo path.
+Prerequisites: Python 3.12, Node.js 22 + npm, Docker Desktop. No OpenAI or Tavily key is needed for the demo path. Run `alembic upgrade head` again after updating from v1 (migration `0002_ai_features`), and `pip install -r requirements.txt` for the new `pypdf` and `python-multipart` dependencies.
 
 ### Windows PowerShell (recommended)
 
@@ -251,7 +293,7 @@ npm test
 npm run build
 ```
 
-Backend tests use a temporary SQLite file, apply the Alembic migration, use fakeredis and the in-process RQ worker, and never call OpenAI or Tavily. They cover signup/login, email normalization, duplicate and concurrent-duplicate signup, password length limits, token expiry, protected routes, profile saving, assessment job creation, worker execution, persistence, ownership checks, task updates, and the gap rubric. Vitest covers the progress helpers, API error formatting, and form validation. `scripts/smoke_journey.py` (via `verify.ps1`/`verify.sh`) runs the full signup → queue → worker → complete task flow against your real Postgres and Redis.
+Backend tests use a temporary SQLite file, apply the Alembic migration, use fakeredis and the in-process RQ worker, and never call OpenAI or Tavily. They cover signup/login, email normalization, duplicate and concurrent-duplicate signup, password length limits, token expiry, protected routes, profile saving, assessment job creation, worker execution, persistence, ownership checks, task updates, and the gap rubric. Vitest covers the progress helpers, API error formatting, and form validation. New AI features: `test_mentor.py` (context scoping, ownership, demo vs live, bounded history, failure handling), `test_roadmap_ai.py` (schema validation, URL grounding, fallback), `test_adapt.py` (history preserved, modes, adaptive priorities), `test_resume.py` (upload validation, evidence grounding, deterministic comparison, privacy), `test_metrics.py`, and `test_v2_journey.py` (signup → profile → resume → AI roadmap → mentor → complete task → adapted plan, with OpenAI mocked). Vitest adds mentor message handling, resume upload validation and roadmap helpers. `scripts/smoke_journey.py` (via `verify.ps1`/`verify.sh`) runs the full signup → queue → worker → complete task flow against your real Postgres and Redis.
 
 ## CI
 
@@ -309,6 +351,11 @@ Create the empty public repository on GitHub first (no README/license, so the pu
 - The token is stored in `localStorage` (acceptable for an MVP; httpOnly cookies would be stronger).
 - No email verification, password reset, or refresh tokens.
 - The Windows worker does not enforce RQ's job timeout.
+- Mentor replies are not streamed.
+- Scanned (image-only) resumes are not supported; there is no OCR.
+- Resume text is truncated to 20,000 characters (12,000 are sent to the model).
+- Adaptation heuristics (6 completed hours = +1 planning level) are a documented rule of thumb, not a skill measurement.
+- Live OpenAI and Tavily behavior could not be exercised without keys; tests mock the model.
 - Not deployed; no screenshots are committed.
 
 ## Documentation

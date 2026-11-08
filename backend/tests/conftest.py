@@ -34,6 +34,9 @@ def migrated_database() -> None:
         "learning_resources",
         "roadmaps",
         "roadmap_tasks",
+        "mentor_conversations",
+        "mentor_messages",
+        "resume_analyses",
     }
     missing = expected - names
     assert not missing, missing

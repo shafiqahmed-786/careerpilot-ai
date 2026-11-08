@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import json
 
-import httpx
+from pydantic import ValidationError
 
+from app import llm
 from app.config import settings
 from app.gaps import GapScore
 from app.schemas import Narrative, ResourceDraft
@@ -81,23 +82,12 @@ def enrich_narrative(
         "Write summary and learn_first_reason."
     )
     try:
-        response = httpx.post(
-            f"{settings.openai_base_url.rstrip('/')}/chat/completions",
-            headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-            json={
-                "model": settings.openai_model,
-                "temperature": 0.2,
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "system", "content": SYSTEM},
-                    {"role": "user", "content": user},
-                ],
-            },
+        data = llm.chat_json(
+            [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
+            temperature=0.2,
+            max_tokens=700,
             timeout=45,
         )
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
-        narrative = Narrative.model_validate(json.loads(content))
-        return narrative, "openai"
-    except Exception:
+        return Narrative.model_validate(data), "openai"
+    except (llm.LLMError, ValidationError, ValueError):
         return fallback, "demo"

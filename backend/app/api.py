@@ -4,11 +4,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import metrics
+from app.adaptive import MODES
+from app.catalog import CATALOG, normalize_role, normalize_skill
 from app.config import settings
 from app.database import get_db
-from app.models import Assessment, AssessmentJob, Profile, Roadmap, RoadmapTask, User
+from app.models import Assessment, AssessmentJob, Profile, ResumeAnalysis, Roadmap, RoadmapTask, User
 from app.queue import enqueue_assessment
 from app.schemas import (
+    ActivityDay,
+    AdaptRequest,
     AssessmentResponse,
     CompetencyResponse,
     DashboardResponse,
@@ -17,6 +22,7 @@ from app.schemas import (
     ProfileRequest,
     ProfileResponse,
     ResourceResponse,
+    ResumeSummary,
     RoadmapResponse,
     SignupRequest,
     TaskResponse,
@@ -127,6 +133,10 @@ def _roadmap_out(roadmap: Roadmap) -> RoadmapResponse:
         weekly_hours=roadmap.weekly_hours,
         overview=roadmap.overview,
         provider=roadmap.provider,
+        source=roadmap.source or "fallback",
+        milestones=roadmap.milestones or [],
+        adapted_count=roadmap.adapted_count or 0,
+        adaptation_note=roadmap.adaptation_note,
         created_at=roadmap.created_at,
         completion_percent=_completion(tasks),
         tasks=[_task_out(task) for task in tasks],
@@ -145,6 +155,7 @@ def _commit(db: Session) -> None:
 def _job_out(job: AssessmentJob) -> JobResponse:
     return JobResponse(
         id=job.id,
+        kind=job.kind or "assessment",
         status=job.status,
         error=job.error,
         assessment_id=job.assessment_id,
@@ -264,15 +275,9 @@ def save_profile(
     return _profile_out(profile)
 
 
-@router.post("/assessments", response_model=JobResponse, status_code=202)
-def create_assessment(
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> JobResponse:
-    profile = db.query(Profile).filter(Profile.user_id == user.id).first()
-    if profile is None or not profile.target_career.strip():
-        raise HTTPException(status_code=400, detail="Complete your career profile before requesting an assessment")
-    job = AssessmentJob(user_id=user.id, status="queued", created_at=datetime.now(UTC))
+def create_and_enqueue(db: Session, user_id: str, kind: str, params: dict | None = None) -> AssessmentJob:
+    """Insert a job row and put its id on the Redis queue. The worker does the actual work."""
+    job = AssessmentJob(user_id=user_id, kind=kind, params=params, status="queued", created_at=datetime.now(UTC))
     db.add(job)
     _commit(db)
     db.refresh(job)
@@ -289,7 +294,41 @@ def create_assessment(
             detail="The job queue is unavailable. Start Redis (docker compose up -d redis) and the RQ worker.",
         ) from exc
     db.refresh(job)
-    return _job_out(job)
+    return job
+
+
+@router.post("/assessments", response_model=JobResponse, status_code=202)
+def create_assessment(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> JobResponse:
+    profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    if profile is None or not profile.target_career.strip():
+        raise HTTPException(status_code=400, detail="Complete your career profile before requesting an assessment")
+    return _job_out(create_and_enqueue(db, user.id, "assessment"))
+
+
+@router.post("/roadmaps/current/adapt", response_model=JobResponse, status_code=202)
+def adapt_roadmap(
+    body: AdaptRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> JobResponse:
+    """Explicit action: re-plan the unstarted part of the roadmap from actual progress."""
+    profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    roadmap = _latest_roadmap(db, user.id)
+    if profile is None or roadmap is None:
+        raise HTTPException(status_code=409, detail="Generate an assessment and roadmap before adapting it")
+    if body.mode not in MODES:
+        raise HTTPException(status_code=422, detail="Unknown adaptation mode")
+    focus = (body.focus_skill or "").strip() or None
+    if body.mode == "focus":
+        role_key, _title = normalize_role(profile.target_career)
+        names = {normalize_skill(item["name"]): item["name"] for item in CATALOG[role_key]["competencies"]}
+        if focus is None or normalize_skill(focus) not in names:
+            raise HTTPException(status_code=422, detail="Choose one of the skills for your target role")
+        focus = names[normalize_skill(focus)]
+    return _job_out(create_and_enqueue(db, user.id, "adapt", {"mode": body.mode, "focus_skill": focus}))
 
 
 @router.get("/jobs/{job_id}", response_model=JobResponse)
@@ -361,7 +400,37 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
     if assessment_out is not None:
         top_gaps = [item for item in assessment_out.competencies if item.status != "sufficient"][:4]
         resources = assessment_out.resources[:6]
+    competencies = assessment_out.competencies if assessment_out else []
+    resume_row = (
+        db.query(ResumeAnalysis)
+        .filter(ResumeAnalysis.user_id == user.id)
+        .order_by(ResumeAnalysis.created_at.desc())
+        .first()
+    )
+    resume_summary = None
+    if resume_row is not None:
+        resume_summary = ResumeSummary(
+            id=resume_row.id,
+            status=resume_row.status,
+            provider=resume_row.provider,
+            match_percent=(resume_row.comparison or {}).get("evidence_coverage_percent"),
+            skills_found=len((resume_row.analysis or {}).get("skills", [])),
+            created_at=resume_row.created_at,
+        )
+    done_weeks, total_weeks = metrics.milestones(tasks)
     return DashboardResponse(
+        readiness_percent=metrics.readiness_percent(competencies) if competencies else None,
+        skills_identified=metrics.skills_identified(
+            profile.skills if profile else [],
+            resume_row.analysis if resume_row is not None and resume_row.status == "completed" else None,
+        ),
+        critical_gaps=sum(1 for item in competencies if item.status != "sufficient" and item.importance >= 4),
+        milestones_completed=done_weeks,
+        milestones_total=total_weeks,
+        streak_days=metrics.streak_days(tasks),
+        activity=[ActivityDay(**day) for day in metrics.activity_days(tasks)],
+        competencies=competencies,
+        resume=resume_summary,
         latest_job=_job_out(job) if job else None,
         profile=_profile_out(profile) if profile else None,
         assessment=assessment_out,

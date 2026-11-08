@@ -49,6 +49,9 @@ class AssessmentJob(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     rq_job_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # "assessment" (full pipeline), "adapt" (revise the current roadmap) or "resume" (resume analysis)
+    kind: Mapped[str] = mapped_column(String(24), nullable=False, default="assessment")
+    params: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     assessment_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     roadmap_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -127,6 +130,11 @@ class Roadmap(Base):
     overview: Mapped[str] = mapped_column(Text, nullable=False)
     provider: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # "ai" when the LLM roadmap passed validation, "fallback" for the deterministic builder
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="fallback")
+    milestones: Mapped[list] = mapped_column(JSON, default=list)
+    adapted_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    adaptation_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     tasks: Mapped[list["RoadmapTask"]] = relationship(
         back_populates="roadmap", cascade="all, delete-orphan"
@@ -155,3 +163,49 @@ class RoadmapTask(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     roadmap: Mapped[Roadmap] = relationship(back_populates="tasks")
+
+
+class MentorConversation(Base):
+    __tablename__ = "mentor_conversations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False, default="New conversation")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    messages: Mapped[list["MentorMessage"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan", order_by="MentorMessage.created_at"
+    )
+
+
+class MentorMessage(Base):
+    __tablename__ = "mentor_messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("mentor_conversations.id"), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)  # "user" or "assistant"
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(32), nullable=True)  # assistant only: "openai" or "demo"
+    notice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    conversation: Mapped[MentorConversation] = relationship(back_populates="messages")
+
+
+class ResumeAnalysis(Base):
+    __tablename__ = "resume_analyses"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="queued")
+    provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    notice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Extracted text only (never the file). Held until the worker finishes, then cleared.
+    source_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    analysis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    comparison: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

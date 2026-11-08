@@ -10,6 +10,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.api import router
 from app.config import settings
 from app.database import engine
+from app.routes_mentor import router as mentor_router
+from app.routes_resume import router as resume_router
 
 logger = logging.getLogger("careerpilot")
 
@@ -62,6 +64,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(router)
+app.include_router(mentor_router)
+app.include_router(resume_router)
 
 
 @app.get("/api/v1/health")

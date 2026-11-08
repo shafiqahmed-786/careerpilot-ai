@@ -144,13 +144,23 @@ class RoadmapResponse(BaseModel):
     weekly_hours: int
     overview: str
     provider: str
+    source: str = "fallback"
+    milestones: list[dict] = Field(default_factory=list)
+    adapted_count: int = 0
+    adaptation_note: str | None = None
     created_at: datetime
     completion_percent: int
     tasks: list[TaskResponse]
 
 
+class AdaptRequest(BaseModel):
+    mode: str = Field(pattern="^(revise|intensive|lighter|focus)$")
+    focus_skill: str | None = Field(default=None, max_length=80)
+
+
 class JobResponse(BaseModel):
     id: str
+    kind: str = "assessment"
     status: str
     error: str | None
     assessment_id: str | None
@@ -160,8 +170,31 @@ class JobResponse(BaseModel):
     finished_at: datetime | None
 
 
+class ActivityDay(BaseModel):
+    date: str
+    count: int
+
+
+class ResumeSummary(BaseModel):
+    id: str
+    status: str
+    provider: str | None
+    match_percent: int | None
+    skills_found: int
+    created_at: datetime
+
+
 class DashboardResponse(BaseModel):
     latest_job: JobResponse | None = None
+    readiness_percent: int | None = None
+    skills_identified: int = 0
+    critical_gaps: int = 0
+    milestones_completed: int = 0
+    milestones_total: int = 0
+    streak_days: int = 0
+    activity: list[ActivityDay] = Field(default_factory=list)
+    competencies: list[CompetencyResponse] = Field(default_factory=list)
+    resume: ResumeSummary | None = None
     profile: ProfileResponse | None
     assessment: AssessmentResponse | None
     roadmap: RoadmapResponse | None
@@ -202,3 +235,61 @@ class TaskDraft(BaseModel):
     completion_criteria: str
     resources: list[ResourceDraft]
     sort_order: int
+
+
+class MentorMessageResponse(BaseModel):
+    id: str
+    role: str
+    content: str
+    provider: str | None
+    notice: str | None
+    created_at: datetime
+
+
+class ConversationSummary(BaseModel):
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationDetail(ConversationSummary):
+    messages: list[MentorMessageResponse]
+
+
+class ConversationCreate(BaseModel):
+    title: str | None = Field(default=None, max_length=120)
+
+
+class MessageCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class MessageExchange(BaseModel):
+    user_message: MentorMessageResponse
+    assistant_message: MentorMessageResponse
+
+
+class MentorStatus(BaseModel):
+    mode: str
+    model: str | None
+    has_profile: bool
+    has_roadmap: bool
+    has_resume: bool
+
+
+class ResumeResponse(BaseModel):
+    id: str
+    filename: str
+    status: str
+    provider: str | None
+    notice: str | None
+    error: str | None
+    created_at: datetime
+    analysis: dict | None
+    comparison: dict | None
+
+
+class ResumeUploadResponse(BaseModel):
+    resume_id: str
+    job: JobResponse

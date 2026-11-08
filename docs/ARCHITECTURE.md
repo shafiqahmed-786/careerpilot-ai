@@ -43,3 +43,30 @@ flowchart LR
 ## Deployment shape
 
 Vercel (frontend) → Render web service (API, runs `alembic upgrade head` on build) + Render worker → managed PostgreSQL and Redis. See the README.
+
+## v2 components
+
+```mermaid
+flowchart LR
+  UI["Next.js app shell<br/>dashboard, mentor, resume, roadmap, assessment"] -->|"REST + JWT"| API["FastAPI /api/v1"]
+  API --> PG[("PostgreSQL")]
+  API -->|"enqueue job id"| Redis[("Redis 'careerpilot'")]
+  API -->|"sync, 40s timeout"| LLM["OpenAI (app/llm.py)"]
+  Redis --> Worker["RQ worker"]
+  Worker --> PG
+  Worker --> Gaps["Gap engine (deterministic)"]
+  Worker --> Search["Tavily / demo catalog"]
+  Worker --> LLM
+  Worker --> Parse["Resume text extraction already done in API; analysis here"]
+```
+
+| Concern | Where |
+| --- | --- |
+| Mentor (request/response, bounded history, context builder) | `app/mentor.py`, `app/routes_mentor.py` |
+| Roadmap generation and validation | `app/roadmap_ai.py`, `app/roadmap_builder.py` (fallback) |
+| Adaptation | `app/adaptive.py`, `pipeline.run_adaptation` |
+| Resume | `app/resume_analysis.py`, `app/routes_resume.py`, `worker.run_resume_job` |
+| Metrics | `app/metrics.py` |
+| LLM client | `app/llm.py` (timeouts, no prompt logging, `LLMError`) |
+
+Jobs: `assessment_jobs.kind` is `assessment`, `adapt` or `resume`; `process_assessment_job` dispatches. The mentor answers inside the request with a timeout because chat must stay responsive; roadmap, adaptation and resume analysis are queued because they are slow. The API extracts resume text synchronously (fast, validates the file), stores only the text on the `resume_analyses` row, and the worker clears it after analysis.

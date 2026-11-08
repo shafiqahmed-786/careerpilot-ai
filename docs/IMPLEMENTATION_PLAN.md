@@ -18,3 +18,13 @@ Status reflects the repository contents. Items marked "owner" need your accounts
 ## Next after the MVP
 
 Email verification and password reset, refresh tokens or httpOnly cookies, more role rubrics, re-generating a roadmap while keeping completed tasks, RAG only if a private corpus (notes, syllabus) is added.
+
+## v2 phases
+
+| Phase | Work | Status |
+| --- | --- | --- |
+| 1. App shell and dashboard | Dark design system, sidebar shell, real metrics and charts | Done |
+| 2. AI mentor | Context builder, persistent conversations, live/demo labelling | Done |
+| 3. AI and adaptive roadmap | Validated LLM plan, fallback, explicit adapt action | Done |
+| 4. Resume intelligence | Upload, extraction, evidence analysis, role comparison, apply to profile | Done |
+| 5. Integration | Tests, docs, CI, packaging | Done; run the checks locally to confirm |
