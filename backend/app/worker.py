@@ -40,10 +40,14 @@ def process_assessment_job(job_id: str) -> None:
         job = db.get(AssessmentJob, job_id)
         if job is not None and job.status != "completed":
             job.status = "failed"
-            job.error = str(exc)[:2000]
-            job.finished_at = datetime.now(UTC)
             if job.kind == "resume":
+                # Exception text can echo resume content, so only a fixed message is stored or shown.
+                known = isinstance(exc, ValueError) and str(exc).startswith("The uploaded resume text")
+                job.error = str(exc) if known else "The resume analysis failed. Upload the file again."
                 _fail_resume(db, job, job.error)
+            else:
+                job.error = str(exc)[:2000]
+            job.finished_at = datetime.now(UTC)
             db.commit()
         raise
     finally:
@@ -64,7 +68,7 @@ def run_resume_job(db, job: AssessmentJob) -> None:
     resume.provider = provider
     resume.notice = notice
     resume.status = "completed"
-    resume.source_text = None  # keep the analysis, drop the raw text
+    resume.source_text = None  # keep the structured analysis, drop the extracted text
 
 
 def _fail_resume(db, job: AssessmentJob, message: str) -> None:

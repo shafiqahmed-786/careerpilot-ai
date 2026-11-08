@@ -41,3 +41,5 @@ GitHub Actions runs backend lint + tests, frontend lint + typecheck + tests + bu
 | Vitest `mentor`, `resume`, `roadmap`, `api` | message handling, upload validation, roadmap grouping, API error formatting |
 
 OpenAI is mocked by patching `app.llm.chat` / `app.llm.chat_json`; no test needs a key or network. Encrypted-PDF handling is implemented but not covered by a generated fixture.
+
+`test_resume_evidence.py` covers: genuine usage, skills-list-only, unrelated quote, hallucinated skill, quote not in resume, mention without usage, missing usage statement, whitespace tolerance, inferred skills never raising coverage, conservative fallback, extracted text cleared after success and failure, abandoned-text purge, ownership/deletion/upload validation, and prompt-injection resistance (system prompt unchanged, obedient model output downgraded).

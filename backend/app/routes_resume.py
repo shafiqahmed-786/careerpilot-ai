@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -12,6 +12,29 @@ from app.schemas import ProfileResponse, ResumeResponse, ResumeUploadResponse
 from app.security import get_current_user
 
 router = APIRouter(prefix="/api/v1/resume")
+
+# Extracted text normally lives for seconds. If the worker never picks the job up, drop it after an hour.
+TEXT_TTL = timedelta(hours=1)
+
+
+def purge_stale_text(db: Session, user_id: str) -> None:
+    cutoff = datetime.now(UTC) - TEXT_TTL
+    rows = (
+        db.query(ResumeAnalysis)
+        .filter(ResumeAnalysis.user_id == user_id, ResumeAnalysis.source_text.is_not(None))
+        .all()
+    )
+    changed = False
+    for row in rows:
+        created = row.created_at if row.created_at.tzinfo else row.created_at.replace(tzinfo=UTC)
+        if created < cutoff:
+            row.source_text = None
+            if row.status in {"queued", "running"}:
+                row.status = "failed"
+                row.error = "The analysis did not start in time and the temporary text was deleted. Upload again."
+            changed = True
+    if changed:
+        db.commit()
 
 
 def _resume_out(row: ResumeAnalysis) -> ResumeResponse:
@@ -42,6 +65,7 @@ def analyze_resume(
     db: Session = Depends(get_db),
 ) -> ResumeUploadResponse:
     # Read at most one byte past the limit so an oversized upload is rejected without loading it all.
+    purge_stale_text(db, user.id)
     data = file.file.read(MAX_BYTES + 1)
     try:
         text = extract_text(file.filename or "", file.content_type, data)
@@ -70,6 +94,7 @@ def analyze_resume(
 
 @router.get("/latest", response_model=ResumeResponse | None)
 def latest_resume(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ResumeResponse | None:
+    purge_stale_text(db, user.id)
     row = (
         db.query(ResumeAnalysis)
         .filter(ResumeAnalysis.user_id == user.id)

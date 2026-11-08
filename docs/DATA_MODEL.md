@@ -39,3 +39,5 @@ erDiagram
 | `resume_analyses` | `user_id`, `filename`, `status`, `provider`, `notice`, `error`, `source_text` (cleared after analysis), `analysis` (JSON), `comparison` (JSON), `created_at` |
 
 All new tables carry `user_id`; every query filters by it and foreign ids return `404`.
+
+`resume_analyses.source_text` lifecycle: set at upload, cleared on success, on failure, and by a 1-hour purge for jobs that never ran. `analysis.skills[].usage` stores the model's one-sentence usage statement for demonstrated skills only.

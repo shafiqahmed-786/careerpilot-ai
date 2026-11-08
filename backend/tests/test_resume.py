@@ -76,9 +76,9 @@ def test_grounding_downgrades_unsupported_claims() -> None:
     claimed = ResumeAnalysisResult(
         overview="A short overview of the resume.",
         skills=[
-            SkillEvidence(name="Python", evidence_level="demonstrated", evidence=[RESUME_EVIDENCE]),
-            SkillEvidence(name="Kubernetes", evidence_level="demonstrated", evidence=["Ran a 40-node cluster"]),
-            SkillEvidence(name="Docker", evidence_level="demonstrated", evidence=["made up quote"]),
+            SkillEvidence(name="Python", evidence_level="demonstrated", evidence=[RESUME_EVIDENCE], usage="Built a REST API with Python"),
+            SkillEvidence(name="Kubernetes", evidence_level="demonstrated", evidence=["Ran a 40-node cluster"], usage="Ran a cluster"),
+            SkillEvidence(name="Docker", evidence_level="demonstrated", evidence=["made up quote"], usage="Used Docker"),
             SkillEvidence(name="Rust", evidence_level="listed"),
         ],
     )

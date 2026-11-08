@@ -148,6 +148,7 @@ export type SkillEvidence = {
   category: string;
   evidence_level: "demonstrated" | "listed" | "inferred";
   evidence: string[];
+  usage?: string;
   confidence: "high" | "medium" | "low";
 };
 

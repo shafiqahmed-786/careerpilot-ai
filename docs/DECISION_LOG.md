@@ -36,3 +36,7 @@
 | Adapt deletes only `pending` tasks | Preserves completed history and in-progress work |
 | Dark design system in Tailwind, no component library | Requested visual direction without new dependencies |
 | `(app)` route group with one `AppShell` | Single auth gate, sidebar and transitions for all authenticated pages |
+
+| Evidence verified per skill by application code | A quote that exists but concerns something else, or a keyword in a skills list, must not become "demonstrated" |
+| Fixed error text for failed resume jobs | Exception messages can contain resume content |
+| 1-hour purge of unprocessed resume text | The worker may be down; extracted text should not linger |

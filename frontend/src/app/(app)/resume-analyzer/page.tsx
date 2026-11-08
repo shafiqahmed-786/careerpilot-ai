@@ -83,7 +83,7 @@ export default function ResumeAnalyzerPage() {
 
   return (
     <>
-      <PageHeader title="Resume Analyzer" subtitle="Upload a PDF or DOCX. Skills are only counted as demonstrated when your resume shows them being used." />
+      <PageHeader title="Resume Analyzer" subtitle="Upload a PDF or DOCX. A skill counts as demonstrated only when a quote from your resume names it and describes real work with it." />
       <div className="space-y-4">
         <div
           className={`rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${drag ? "border-accent bg-accent/5" : "border-line bg-surface"}`}
@@ -97,7 +97,7 @@ export default function ResumeAnalyzerPage() {
             <>
               <p className="text-sm">Drag and drop your resume here, or</p>
               <button className={`${btnPrimary} mt-3`} onClick={() => input.current?.click()} type="button">Choose a file</button>
-              <p className="mt-3 text-xs text-muted">PDF or DOCX, up to {MAX_RESUME_BYTES / 1024 / 1024} MB. The file is read in memory and never stored.</p>
+              <p className="mt-3 text-xs text-muted">PDF or DOCX, up to {MAX_RESUME_BYTES / 1024 / 1024} MB. The file itself is never stored. Its extracted text is kept only while the analysis runs (and deleted when it finishes or fails, or after 1 hour at most); only the structured result is saved.</p>
             </>
           )}
           <input accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-label="Resume file" className="hidden" onChange={(e) => void upload(e.target.files?.[0])} ref={input} type="file" />
@@ -167,6 +167,7 @@ export default function ResumeAnalyzerPage() {
                       <li key={s.name} className="text-sm">
                         <p>{s.name} <span className="text-xs text-muted">· {s.category}</span></p>
                         {s.evidence.map((e) => <p key={e} className="mt-1 text-xs italic text-muted">“{e}”</p>)}
+                        {level === "demonstrated" && s.usage ? <p className="mt-0.5 text-xs text-muted">How it was used: {s.usage}</p> : null}
                       </li>
                     ))}
                   </ul>

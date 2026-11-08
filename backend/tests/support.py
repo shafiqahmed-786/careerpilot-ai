@@ -128,10 +128,10 @@ def fake_llm_json(messages: list[dict], **_kwargs) -> dict:
             "projects": [{"name": "Notes API", "summary": "REST API with tests", "technologies": ["Python", "PostgreSQL"]}],
             "skills": [
                 {"name": "Python", "category": "Languages", "evidence_level": "demonstrated",
-                 "evidence": [RESUME_EVIDENCE], "confidence": "high"},
+                 "evidence": [RESUME_EVIDENCE], "usage": "Built a REST API with Python", "confidence": "high"},
                 {"name": "Docker", "category": "DevOps", "evidence_level": "listed", "evidence": [], "confidence": "low"},
                 {"name": "Kubernetes", "category": "DevOps", "evidence_level": "demonstrated",
-                 "evidence": ["Orchestrated a 40-node Kubernetes cluster"], "confidence": "high"},
+                 "evidence": ["Orchestrated a 40-node Kubernetes cluster"], "usage": "Ran a cluster", "confidence": "high"},
             ],
             "achievements": [],
             "strengths": ["Has a tested API project"],

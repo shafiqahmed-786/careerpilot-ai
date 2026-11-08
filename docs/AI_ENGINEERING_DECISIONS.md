@@ -54,3 +54,7 @@ Snippets are truncated and placed inside `<untrusted_page>` tags. The system pro
 - **Cost.** One call per operation; `max_tokens` bounded; no retries; no extra calls.
 - **No frameworks.** Direct HTTP to the OpenAI API; no LangChain, agents or vector store.
 - **Adaptation rule.** Every 6 completed hours on a skill raise its planning level by one (capped at the target) to re-rank focus skills. This is a transparent heuristic, documented as such.
+
+## Resume evidence verification
+
+`app/evidence.py` (standard library only) validates every skill independently of the model. The prompt requires per-skill evidence (`evidence` quote + `usage` sentence), but the application accepts `demonstrated` only if (1) the quote exists in the resume as one passage after safe normalization, (2) the quote names that exact skill or a true synonym, (3) it is not a skills section or list, and (4) the clause naming the skill contains a usage verb and is not a weak claim (familiar with, basic knowledge of, ...). Otherwise the skill is downgraded to `listed` if the resume names it, else `inferred`. The same verifier checks the keyword fallback. `compare_to_role` additionally refuses to credit `demonstrated` without a verified quote, and inferred skills are worth 0 points. Known limit: usage detection is a verb heuristic applied *after* the model's contextual judgement; it can reject phrasing without a common verb (the skill then shows as listed, which errs on the safe side).

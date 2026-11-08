@@ -51,7 +51,7 @@ export default function SettingsPage() {
         ) : null}
         <Card>
           <h2 className="text-sm font-medium">Privacy</h2>
-          <p className="mt-2 text-sm text-muted">Resume files are read in memory and never stored. Only the extracted analysis is saved, and you can delete it from the Resume Analyzer. Chat history is private to your account.</p>
+          <p className="mt-2 text-sm text-muted">Resume files are read in memory and never stored. The extracted text is held temporarily only while the analysis runs, then deleted (also if the analysis fails, or after at most 1 hour if it never starts). Only the structured analysis is saved, and you can delete it from the Resume Analyzer. Chat history is private to your account.</p>
         </Card>
       </div>
     </>
