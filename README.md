@@ -6,9 +6,9 @@
 
 | | |
 | --- | --- |
-| **Live demo** | `[Add deployed application URL after deployment]` |
+| **Live demo** | `[[Add deployed application URL after deployment]](https://frontend-two-sand-84.vercel.app/)` |
 | **API health** | `[Add deployed API URL]/api/v1/health/ready` |
-| **Repository** | `[Add public GitHub repository URL]` |
+| **Repository** | `[[Add public GitHub repository URL]](https://github.com/shafiqahmed-786/careerpilot-ai)` |
 
 <!-- DEPLOYED_URL: replace the placeholders above after you deploy. Nothing in this repository claims a deployment exists. -->
 
