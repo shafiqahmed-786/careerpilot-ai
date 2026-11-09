@@ -187,7 +187,7 @@ class MentorMessage(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(16), nullable=False)  # "user" or "assistant"
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    provider: Mapped[str | None] = mapped_column(String(32), nullable=True)  # assistant only: "openai" or "demo"
+    provider: Mapped[str | None] = mapped_column(String(32), nullable=True)  # assistant only: "groq" or "demo"
     notice: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

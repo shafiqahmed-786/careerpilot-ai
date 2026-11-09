@@ -152,13 +152,13 @@ def test_resume_pipeline_demo_mode_and_privacy(client: TestClient, monkeypatch) 
 
 def test_resume_live_analysis_is_grounded(client: TestClient, monkeypatch) -> None:
     fake = use_fake_redis(monkeypatch)
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
     monkeypatch.setattr("app.llm.chat_json", fake_llm_json)
     token = auth(client, "resume-live@example.com")
     assert _upload(client, token).status_code == 202
     run_worker(fake)
     latest = client.get("/api/v1/resume/latest", headers=bearer(token)).json()
-    assert latest["provider"] == "openai" and latest["notice"] is None
+    assert latest["provider"] == "groq" and latest["notice"] is None
     skills = {s["name"]: s for s in latest["analysis"]["skills"]}
     assert skills["Python"]["evidence_level"] == "demonstrated"
     assert skills["Kubernetes"]["evidence_level"] == "inferred"  # fabricated quote rejected
@@ -167,7 +167,7 @@ def test_resume_live_analysis_is_grounded(client: TestClient, monkeypatch) -> No
 
 def test_invalid_model_output_falls_back_and_apply_to_profile(client: TestClient, monkeypatch) -> None:
     fake = use_fake_redis(monkeypatch)
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
     monkeypatch.setattr("app.llm.chat_json", lambda *a, **k: {"overview": "x"})
     token = auth(client, "resume-apply@example.com")
     assert client.put("/api/v1/profile", json=PROFILE, headers=bearer(token)).status_code == 200

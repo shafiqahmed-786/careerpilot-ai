@@ -28,9 +28,9 @@ describe("mentor message handling", () => {
   });
 
   it("labels the provider honestly", () => {
-    expect(providerLabel("openai")).toContain("Live AI");
-    expect(providerLabel("demo")).toContain("not a live LLM");
-    expect(providerLabel(null)).toContain("Demo");
+    expect(providerLabel("groq")).toBe("AI Mentor");
+    expect(providerLabel("demo")).toBe("Guided Answer");
+    expect(providerLabel(null)).toBe("Guided Answer");
   });
 
   it("splits the demo-mode note from the answer", () => {

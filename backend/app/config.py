@@ -12,11 +12,11 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-change-me"
     jwt_expire_minutes: int = 60 * 24 * 7
     database_url: str = "postgresql+psycopg2://careerpilot:careerpilot@localhost:5432/careerpilot"
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://localhost:6380/0"
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
-    openai_api_key: str | None = None
-    openai_model: str = "gpt-4o-mini"
-    openai_base_url: str = "https://api.openai.com/v1"
+    groq_api_key: str | None = None
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
     tavily_api_key: str | None = None
 
     @field_validator("database_url", mode="before")
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
             return "postgresql+psycopg2://" + value[len("postgresql://") :]
         return value
 
-    @field_validator("openai_api_key", "tavily_api_key", mode="before")
+    @field_validator("groq_api_key", "tavily_api_key", mode="before")
     @classmethod
     def blank_to_none(cls, value: str | None) -> str | None:
         if value is None or (isinstance(value, str) and not value.strip()):
@@ -43,7 +43,9 @@ class Settings(BaseSettings):
 
     @property
     def llm_mode(self) -> str:
-        return "openai" if self.openai_api_key else "demo"
+        # Groq is the exclusive LLM provider throughout CareerPilot AI.
+        # Even if OPENAI_API_KEY exists in .env or the environment, it is never used.
+        return "groq" if self.groq_api_key else "demo"
 
     @property
     def search_mode(self) -> str:

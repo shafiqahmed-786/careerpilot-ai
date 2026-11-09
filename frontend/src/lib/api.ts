@@ -136,7 +136,7 @@ export type MentorMessage = {
 export type ConversationSummary = { id: string; title: string; created_at: string; updated_at: string };
 export type ConversationDetail = ConversationSummary & { messages: MentorMessage[] };
 export type MentorStatus = {
-  mode: "openai" | "demo";
+  mode: "groq" | "demo" | string;
   model: string | null;
   has_profile: boolean;
   has_roadmap: boolean;

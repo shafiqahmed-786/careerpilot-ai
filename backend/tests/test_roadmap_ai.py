@@ -47,11 +47,11 @@ def _payload() -> dict:
 
 
 def test_valid_ai_roadmap_is_accepted_and_urls_are_grounded(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
     monkeypatch.setattr("app.llm.chat_json", lambda *a, **k: _payload())
     result = generate_roadmap(**_args())
     assert result.source == "ai"
-    assert result.provider == "openai"
+    assert result.provider == "groq"
     assert [task.week_number for task in result.tasks] == [1, 2, 3, 4]
     allowed = {item.url for item in RESOURCES}
     assert all(res.url in allowed for task in result.tasks for res in task.resources)
@@ -59,7 +59,7 @@ def test_valid_ai_roadmap_is_accepted_and_urls_are_grounded(monkeypatch) -> None
 
 
 def test_invalid_output_falls_back_to_the_deterministic_builder(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
     monkeypatch.setattr("app.llm.chat_json", lambda *a, **k: {"overview": "too short", "weeks": []})
     result = generate_roadmap(**_args())
     assert result.source == "fallback"
@@ -69,7 +69,7 @@ def test_invalid_output_falls_back_to_the_deterministic_builder(monkeypatch) -> 
 
 
 def test_llm_errors_fall_back(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
 
     def boom(*_args, **_kwargs):
         raise llm.LLMError("timeout")
@@ -79,7 +79,7 @@ def test_llm_errors_fall_back(monkeypatch) -> None:
 
 
 def test_without_a_key_no_llm_call_is_made(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", None)
+    monkeypatch.setattr(settings, "groq_api_key", None)
 
     def fail(*_args, **_kwargs):
         raise AssertionError("must not call the model")

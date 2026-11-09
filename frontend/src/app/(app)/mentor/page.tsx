@@ -90,18 +90,18 @@ export default function MentorPage() {
     }
   }
 
-  const live = status?.mode === "openai";
+  const live = status?.mode === "groq";
 
   return (
     <>
       <PageHeader
         title="AI Career Mentor"
         subtitle="Answers use your profile, skill gaps, roadmap progress and resume evidence."
-        actions={status ? <AiBadge live={live} label={live ? `Live AI · ${status.model}` : "Demo mode · no live LLM"} /> : undefined}
+        actions={status ? <AiBadge live={live} label={live ? "AI Career Mentor" : "Guide Mode (Demo)"} /> : undefined}
       />
       {status && !live ? (
         <p className="mb-4 rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
-          No OpenAI key is configured, so replies are assembled from your saved data by a template. They are clearly labelled and are not written by a language model.
+          Career Mentor is running in standard guide mode. Answers are assembled from your saved career profile and roadmap data.
         </p>
       ) : null}
       <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
@@ -139,7 +139,7 @@ export default function MentorPage() {
                     <p className="whitespace-pre-wrap leading-relaxed">{parts.body}</p>
                     {m.role === "assistant" ? (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge tone={m.provider === "openai" ? "accent" : "warn"}>{providerLabel(m.provider)}</Badge>
+                        <Badge tone={m.provider === "groq" ? "accent" : "warn"}>{providerLabel(m.provider)}</Badge>
                         {m.notice ? <span className="text-xs text-warn">{m.notice}</span> : null}
                         {parts.note ? <span className="text-xs text-muted">{parts.note}</span> : null}
                       </div>

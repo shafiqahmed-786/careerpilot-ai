@@ -68,7 +68,7 @@ def test_context_is_scoped_to_the_user(client: TestClient, monkeypatch) -> None:
 
 def test_live_answers_receive_context_and_progress(client: TestClient, monkeypatch) -> None:
     token, _fake = setup_roadmap(client, monkeypatch, "mentor-live@example.com")
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
     seen: list[list[dict]] = []
 
     def fake_chat(messages, **_kwargs):
@@ -81,7 +81,7 @@ def test_live_answers_receive_context_and_progress(client: TestClient, monkeypat
     conversation_id = _conversation(client, token)
 
     answer = _ask(client, token, conversation_id, "What next?").json()["assistant_message"]
-    assert answer["provider"] == "openai"
+    assert answer["provider"] == "groq"
     system = seen[-1][0]["content"]
     assert "<user_context>" in system and "Backend Engineer" in system and first["title"] in system
     assert "Python (3/5)" in system  # self-reported skills reach the model
@@ -96,7 +96,7 @@ def test_live_answers_receive_context_and_progress(client: TestClient, monkeypat
 
 def test_history_window_is_bounded(client: TestClient, monkeypatch) -> None:
     token = auth(client, "mentor-window@example.com")
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
     seen: list[list[dict]] = []
     monkeypatch.setattr("app.llm.chat", lambda messages, **_k: seen.append(messages) or "ok")
     conversation_id = _conversation(client, token)
@@ -108,7 +108,7 @@ def test_history_window_is_bounded(client: TestClient, monkeypatch) -> None:
 def test_model_failure_keeps_the_question_and_labels_the_fallback(client: TestClient, monkeypatch) -> None:
     token = auth(client, "mentor-fail@example.com")
     assert client.put("/api/v1/profile", json=PROFILE, headers=bearer(token)).status_code == 200
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
 
     def boom(*_args, **_kwargs):
         raise LLMError("timeout")

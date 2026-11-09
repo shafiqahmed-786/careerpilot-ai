@@ -7,17 +7,26 @@ _DB = _DIR / "test.db"
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///" + _DB.as_posix()
 os.environ["JWT_SECRET"] = "test-secret-key"
 os.environ["APP_ENV"] = "test"
-os.environ["OPENAI_API_KEY"] = ""
+os.environ["GROQ_API_KEY"] = ""
+os.environ["GROQ_MODEL"] = "llama-3.3-70b-versatile"
+os.environ["GROQ_BASE_URL"] = "https://api.groq.com/openai/v1"
 os.environ["TAVILY_API_KEY"] = ""
 os.environ["CORS_ORIGINS"] = "http://localhost:3000"
 
 import pytest
 from alembic import command
 from alembic.config import Config
+from app.config import settings
 from app.database import engine
 from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
+
+
+@pytest.fixture(autouse=True)
+def _reset_keys_for_tests(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", None)
+    monkeypatch.setattr(settings, "tavily_api_key", None)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -44,8 +53,8 @@ def migrated_database() -> None:
 
 @pytest.fixture
 def client() -> TestClient:
-    with TestClient(app) as test_client:
-        yield test_client
+    test_client = TestClient(app)
+    yield test_client
 
 
 def auth(client: TestClient, email: str, password: str = "password123") -> str:

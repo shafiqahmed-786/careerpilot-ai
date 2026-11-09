@@ -63,7 +63,7 @@ def enrich_narrative(
     resources: list[ResourceDraft],
 ) -> tuple[Narrative, str]:
     fallback = template_narrative(role_title, gaps)
-    if not settings.openai_api_key:
+    if not llm.available():
         return fallback, "demo"
     facts = [
         {
@@ -88,6 +88,6 @@ def enrich_narrative(
             max_tokens=700,
             timeout=45,
         )
-        return Narrative.model_validate(data), "openai"
+        return Narrative.model_validate(data), "groq"
     except (llm.LLMError, ValidationError, ValueError):
         return fallback, "demo"

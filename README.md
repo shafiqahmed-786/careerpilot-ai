@@ -26,7 +26,7 @@ CareerPilot is a personalized career-intelligence and learning platform, not a c
 - **Verifies**: a resume analyzer separates skills *demonstrated by evidence* from skills *merely listed*, and an independent verifier rejects any quote that does not actually support the skill.
 - **Mentors**: a persistent AI mentor receives a compact summary of your real database state (gaps, tasks done and pending, resume evidence), not a blank prompt.
 - **Adapts**: on request, only your unstarted tasks are re-planned from observed progress; completed work is kept.
-- **Is honest about AI**: every AI-produced artifact stores and displays its real provider (`openai` or `demo`). With no API keys, everything still works and says so.
+- **Is honest about AI**: every AI-produced artifact stores and displays its real provider (`groq` or `demo`). With no API keys, everything still works and says so.
 
 Supported target roles (rubric catalog): Backend, Frontend, Full Stack, Software, Machine Learning (also matches "AI Engineer"), DevOps, QA, Data Analyst, Data Scientist. Unknown roles use the Software Engineer rubric.
 
@@ -36,7 +36,7 @@ Supported target roles (rubric catalog): Backend, Frontend, Full Stack, Software
 | --- | --- |
 | Free choice of problem; "AI Career Coach" | Help students decide what to learn, find relevant content, and pursue a goal: [assessment](#ai-design-at-a-glance), [resource discovery](#why-web-search-instead-of-a-vector-rag-pipeline), [roadmap](#ai-generated-personalized-roadmap), [mentor](#ai-career-mentor), [progress tracking](#dashboard-and-progress-metrics) |
 | New project, fresh public repo | Standalone codebase, no RuFlow or MedResearch code. Repository: `[Add public GitHub repository URL]` |
-| 5-6+ components | Frontend (Next.js), API (FastAPI), database (PostgreSQL), background worker and queue (RQ + Redis), AI (OpenAI + Tavily + rule engine), auth (JWT + bcrypt). See [Architecture](#architecture) |
+| 5-6+ components | Frontend (Next.js), API (FastAPI), database (PostgreSQL), background worker and queue (RQ + Redis), AI (Groq + Tavily + rule engine), auth (JWT + bcrypt). See [Architecture](#architecture) |
 | Built with AI coding agents; spec and plan docs in the repo | [Workflow](#ai-native-development-workflow); [PRD](docs/PRD.md), [Architecture](docs/ARCHITECTURE.md), [Implementation plan](docs/IMPLEMENTATION_PLAN.md), [AI decisions](docs/AI_ENGINEERING_DECISIONS.md), [Data model](docs/DATA_MODEL.md), [Decision log](docs/DECISION_LOG.md), [Testing strategy](docs/TESTING_STRATEGY.md); agent notes in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md) |
 | Tests | 12 backend test modules and 5 frontend test files. See [Testing](#testing-and-verification-status) for the exact verification state |
 | CI | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
@@ -75,22 +75,22 @@ flowchart LR
     ADAPT["Plan adaptation"]
     RES["Resume analysis<br/>+ evidence verifier"]
   end
-  OPENAI["OpenAI API"]
+  GROQ["Groq API (OpenAI-compatible)"]
   TAVILY["Tavily Search API"]
 
   UI -->|"REST + Bearer JWT"| AUTH
   AUTH --> MENTOR & ENQ & READ
   MENTOR <--> PG
-  MENTOR -->|"40 s timeout"| OPENAI
+  MENTOR -->|"40 s timeout"| GROQ
   ENQ -->|"job row"| PG
   ENQ -->|"job id"| REDIS
   READ --> PG
   REDIS --> Worker
   Worker <--> PG
   PIPE --> TAVILY
-  PIPE --> OPENAI
-  ADAPT --> OPENAI
-  RES --> OPENAI
+  PIPE --> GROQ
+  ADAPT --> GROQ
+  RES --> GROQ
 ```
 
 ### Synchronous vs asynchronous flow
@@ -415,8 +415,8 @@ Copy [`.env.example`](.env.example) to `.env` (read by the API, worker and Alemb
 | `DATABASE_URL` | API, worker, Alembic | PostgreSQL URL (`postgres://` and `postgresql://` are normalized to `postgresql+psycopg2://`) |
 | `REDIS_URL` | API, worker | Queue connection |
 | `CORS_ORIGINS` | API | Comma-separated allowed browser origins (your frontend URL in production, no trailing slash) |
-| `OPENAI_API_KEY` | worker, API (mentor) | Enables live mentor, roadmap, resume analysis and narrative. Empty means demo mode |
-| `OPENAI_MODEL`, `OPENAI_BASE_URL` | worker, API | Defaults `gpt-4o-mini`, `https://api.openai.com/v1` |
+| `GROQ_API_KEY` | worker, API (mentor) | Enables live mentor, roadmap, resume analysis and narrative via Groq. Empty means demo mode |
+| `GROQ_MODEL`, `GROQ_BASE_URL` | worker, API | Defaults `llama-3.3-70b-versatile`, `https://api.groq.com/openai/v1` |
 | `TAVILY_API_KEY` | worker | Enables live resource search. Empty means the demo catalog |
 | `NEXT_PUBLIC_API_URL` | frontend | Public API origin (default `http://localhost:8000`); baked in at build time |
 
@@ -444,7 +444,7 @@ flowchart TB
     DB[("PostgreSQL")]
     R[("Redis")]
     W["RQ Background Worker<br/>Render"]
-    AI["OpenAI API"]
+    AI["Groq API"]
     T["Tavily Search API"]
 
     U --> FE
@@ -467,7 +467,7 @@ flowchart TB
 | Background worker | Render | Asynchronous assessments, roadmap adaptation and resume analysis |
 | Database | PostgreSQL | User accounts, profiles, assessments, roadmaps, conversations and application data |
 | Queue | Redis + RQ | Background job scheduling and execution |
-| Generative AI | OpenAI | Personalized roadmap generation, resume analysis and contextual mentorship |
+| Generative AI | Groq | Personalized roadmap generation, resume analysis and contextual mentorship |
 | Resource discovery | Tavily | Live discovery of relevant learning resources |
 
 ### Production configuration
@@ -484,8 +484,9 @@ The backend uses the following environment configuration:
 | `DATABASE_URL` | PostgreSQL connection |
 | `REDIS_URL` | Redis connection |
 | `CORS_ORIGINS` | Authorized frontend origin |
-| `OPENAI_API_KEY` | Enables live generative AI functionality |
-| `OPENAI_MODEL` | Configured OpenAI model |
+| `GROQ_API_KEY` | Enables live generative AI functionality via Groq |
+| `GROQ_MODEL` | Configured Groq model (e.g. `llama-3.3-70b-versatile`) |
+| `GROQ_BASE_URL` | Groq OpenAI-compatible endpoint (`https://api.groq.com/openai/v1`) |
 | `TAVILY_API_KEY` | Enables live learning-resource discovery |
 
 Secrets are configured through hosting-provider environment settings and are not committed to Git.

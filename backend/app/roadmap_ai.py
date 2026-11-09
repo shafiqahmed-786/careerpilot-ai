@@ -70,7 +70,7 @@ class RoadmapResult:
     milestones: list[dict]
     overview: str | None
     source: str  # "ai" or "fallback"
-    provider: str  # "openai" or "demo"
+    provider: str  # "groq" or "demo"
     fallback_reason: str | None = None
     extra: dict = field(default_factory=dict)
 
@@ -268,4 +268,4 @@ def generate_roadmap(
         )
     except (llm.LLMError, ValidationError, ValueError) as exc:
         return fallback(f"AI roadmap rejected: {type(exc).__name__}")
-    return RoadmapResult(tasks=tasks, milestones=milestones, overview=ai.overview.strip(), source="ai", provider="openai")
+    return RoadmapResult(tasks=tasks, milestones=milestones, overview=ai.overview.strip(), source="ai", provider="groq")

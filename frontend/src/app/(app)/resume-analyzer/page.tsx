@@ -92,7 +92,7 @@ export default function ResumeAnalyzerPage() {
           onDrop={(e) => { e.preventDefault(); setDrag(false); void upload(e.dataTransfer.files[0]); }}
         >
           {busy ? (
-            <p className="flex items-center justify-center gap-2 text-sm" role="status"><Spinner />{phase === "uploading" ? "Uploading and reading your resume…" : "Analyzing in the background worker…"}</p>
+            <p className="flex items-center justify-center gap-2 text-sm" role="status"><Spinner />{phase === "uploading" ? "Uploading and reading your resume…" : "Extracting demonstrated skills and verifying evidence…"}</p>
           ) : (
             <>
               <p className="text-sm">Drag and drop your resume here, or</p>
@@ -112,7 +112,7 @@ export default function ResumeAnalyzerPage() {
           <>
             <Card>
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <AiBadge live={result.provider === "openai"} label={result.provider === "openai" ? "Analyzed by OpenAI" : "Keyword analysis (demo, no LLM)"} />
+                <AiBadge live={result.provider === "groq"} label={result.provider === "groq" ? "AI Verified Analysis" : "Sample Analysis (Demo)"} />
                 <Badge>{result.filename}</Badge>
               </div>
               {result.notice ? <p className="mb-2 text-xs text-warn">{result.notice}</p> : null}

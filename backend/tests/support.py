@@ -92,7 +92,7 @@ def setup_roadmap(client: TestClient, monkeypatch, email: str, profile: dict | N
 
 
 def fake_llm_json(messages: list[dict], **_kwargs) -> dict:
-    """Stands in for OpenAI JSON mode. Picks the response by the system prompt."""
+    """Stands in for Groq JSON mode. Picks the response by the system prompt."""
     system = messages[0]["content"]
     if "learning-plan writer" in system:
         spec = json.loads(messages[1]["content"].splitlines()[0])

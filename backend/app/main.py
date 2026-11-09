@@ -101,6 +101,7 @@ def ready() -> dict:
         "migrations": migrated,
         "redis": redis_ok,
         "llm": settings.llm_mode,
+        "llm_model": settings.groq_model if settings.llm_mode == "groq" else None,
         "search": settings.search_mode,
         "database_error": db_error,
         "redis_error": redis_error,

@@ -14,7 +14,7 @@ export async function waitForJob(
     options.onUpdate?.(job);
     if (job.status === "completed" || job.status === "failed") return job;
     if (Date.now() > deadline) {
-      throw new Error("The job is taking longer than expected. Make sure the RQ worker is running (python -m app.worker).");
+      throw new Error("Your request is taking longer than expected. Please refresh or try again in a moment.");
     }
     await sleep(interval);
   }

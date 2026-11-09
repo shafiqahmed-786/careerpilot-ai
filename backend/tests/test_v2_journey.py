@@ -7,9 +7,9 @@ DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 def test_full_ai_journey(client: TestClient, monkeypatch) -> None:
-    """Signup, profile, resume, AI roadmap, mentor, task completion, adapted guidance (OpenAI mocked)."""
+    """Signup, profile, resume, AI roadmap, mentor, task completion, adapted guidance (Groq mocked)."""
     fake = use_fake_redis(monkeypatch)
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
     monkeypatch.setattr("app.llm.chat_json", fake_llm_json)
     prompts: list[str] = []
 
@@ -31,16 +31,16 @@ def test_full_ai_journey(client: TestClient, monkeypatch) -> None:
     run_worker(fake)  # resume job and assessment job go through the real queue
 
     resume = client.get("/api/v1/resume/latest", headers=headers).json()
-    assert resume["status"] == "completed" and resume["provider"] == "openai"
+    assert resume["status"] == "completed" and resume["provider"] == "groq"
     assert resume["comparison"]["target_role"] == "Backend Engineer"
 
     assessment = client.get("/api/v1/assessments/latest", headers=headers).json()
-    assert assessment["provider"] == "openai"
+    assert assessment["provider"] == "groq"
     sql = next(c for c in assessment["competencies"] if c["name"] == "SQL")
     assert sql["self_reported_level"] == 0  # the resume never changes the deterministic score
 
     roadmap = client.get("/api/v1/roadmaps/current", headers=headers).json()
-    assert roadmap["source"] == "ai" and roadmap["provider"] == "openai"
+    assert roadmap["source"] == "ai" and roadmap["provider"] == "groq"
     assert [m["week"] for m in roadmap["milestones"]] == [1, 2, 3, 4]
     urls = {r["url"] for r in assessment["resources"]}
     assert all(res["url"] in urls for task in roadmap["tasks"] for res in task["resources"])
@@ -49,9 +49,9 @@ def test_full_ai_journey(client: TestClient, monkeypatch) -> None:
     conversation = client.post("/api/v1/mentor/conversations", headers=headers).json()["id"]
     ask = f"/api/v1/mentor/conversations/{conversation}/messages"
     first = client.post(ask, json={"content": "What should I focus on this week?"}, headers=headers)
-    assert first.json()["assistant_message"]["provider"] == "openai"
+    assert first.json()["assistant_message"]["provider"] == "groq"
     task = roadmap["tasks"][0]
-    assert task["title"] in prompts[-1] and "RESUME (openai)" in prompts[-1]
+    assert task["title"] in prompts[-1] and "RESUME (groq)" in prompts[-1]
 
     done = client.patch(f"/api/v1/tasks/{task['id']}", json={"status": "completed", "notes": "shipped"}, headers=headers)
     assert done.status_code == 200

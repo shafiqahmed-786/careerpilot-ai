@@ -2,7 +2,7 @@
 
 The context builder reads only the authenticated user's rows and produces a compact summary
 (profile, top gaps, roadmap progress, resume evidence). The model gets that summary plus a bounded
-window of recent messages, never the whole database. Without an OpenAI key (or when the call
+window of recent messages, never the whole database. Without a Groq key (or when the call
 fails) a template answer built from the same context is returned and labelled "demo".
 """
 
@@ -245,7 +245,7 @@ def answer(db: Session, user: User, conversation: MentorConversation, content: s
         messages += [{"role": m.role, "content": m.content} for m in history]
         try:
             reply = llm.chat(messages, temperature=0.4, max_tokens=700, timeout=40).strip()
-            provider = "openai"
+            provider = "groq"
         except llm.LLMError:
             notice = "The live AI request failed, so this is a template answer."
     if provider == "demo":

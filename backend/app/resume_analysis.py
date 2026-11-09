@@ -335,9 +335,9 @@ def llm_analysis(text: str, target_career: str | None) -> ResumeAnalysisResult:
 def analyze_text(text: str, target_career: str | None) -> tuple[ResumeAnalysisResult, str, str | None]:
     """Return (analysis, provider, notice). Falls back to keyword analysis, clearly labelled."""
     if not llm.available():
-        return heuristic_analysis(text), "demo", "No OpenAI key is configured, so keyword matching was used instead of an LLM."
+        return heuristic_analysis(text), "demo", "No Groq key is configured, so keyword matching was used instead of an LLM."
     try:
-        return llm_analysis(text, target_career), "openai", None
+        return llm_analysis(text, target_career), "groq", None
     except (llm.LLMError, ValidationError, ValueError):
         return (
             heuristic_analysis(text),

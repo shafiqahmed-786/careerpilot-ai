@@ -46,7 +46,7 @@ export default function AssessmentPage() {
       <>
         <PageHeader title="Skill Assessment" />
         <ErrorNote message={error} />
-        <EmptyState title="No assessment yet" text="Complete your profile first. The worker scores every competency for your target role." action={<Link className={btnPrimary} href="/onboarding">Go to my profile</Link>} />
+        <EmptyState title="No assessment yet" text="Complete your profile first to evaluate your skills and generate a personalized readiness assessment." action={<Link className={btnPrimary} href="/onboarding">Go to my profile</Link>} />
       </>
     );
   }
@@ -57,7 +57,7 @@ export default function AssessmentPage() {
       <div className="space-y-4">
         <ErrorNote message={error} />
         <Card>
-          <div className="mb-2 flex items-center gap-2"><AiBadge live={data.provider === "openai"} label={data.provider === "openai" ? "Narrative by OpenAI" : "Narrative by template (demo)"} /><Badge>Rubric {data.rubric_version}</Badge></div>
+          <div className="mb-2 flex items-center gap-2"><AiBadge live={data.provider === "groq"} label={data.provider === "groq" ? "AI Narrative Analysis" : "Narrative Summary (Demo)"} /><Badge>Rubric {data.rubric_version}</Badge></div>
           <p className="text-sm leading-relaxed">{data.summary}</p>
           <p className="mt-2 text-sm text-muted">{data.learn_first_reason}</p>
           <p className="mt-3 text-xs text-warn">{data.disclaimer}</p>

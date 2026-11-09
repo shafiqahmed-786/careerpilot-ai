@@ -53,7 +53,7 @@ def _detail(conversation: MentorConversation) -> ConversationDetail:
 def status(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> MentorStatus:
     return MentorStatus(
         mode=settings.llm_mode,
-        model=settings.openai_model if settings.llm_mode == "openai" else None,
+        model=settings.groq_model if settings.llm_mode == "groq" else None,
         has_profile=db.query(Profile).filter(Profile.user_id == user.id).first() is not None,
         has_roadmap=db.query(Roadmap).filter(Roadmap.user_id == user.id).first() is not None,
         has_resume=db.query(ResumeAnalysis)

@@ -21,8 +21,12 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false # e.g. https://your-app.vercel.app (comma-separated, no trailing slash)
-      - key: OPENAI_API_KEY
+      - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_BASE_URL
+        value: https://api.groq.com/openai/v1
       - key: TAVILY_API_KEY
         sync: false
   - type: worker
@@ -42,7 +46,11 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
-      - key: OPENAI_API_KEY
+      - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_BASE_URL
+        value: https://api.groq.com/openai/v1
       - key: TAVILY_API_KEY
         sync: false

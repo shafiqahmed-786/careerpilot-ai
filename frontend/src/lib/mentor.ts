@@ -11,8 +11,8 @@ export const STARTERS = [
 ];
 
 export function providerLabel(provider: string | null | undefined): string {
-  if (provider === "openai") return "Live AI · OpenAI";
-  return "Demo mode · template, not a live LLM";
+  if (provider === "groq") return "AI Mentor";
+  return "Guided Answer";
 }
 
 export function pendingUserMessage(text: string): MentorMessage {

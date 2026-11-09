@@ -138,17 +138,28 @@ export default function DashboardPage() {
       />
       <div className="space-y-4">
         {working ? (
-          <div className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm" role="status">
-            {job?.status === "queued" ? `Your ${KIND[job.kind] ?? "job"} is queued for the background worker.` : `The worker is building your ${KIND[job?.kind ?? ""] ?? "plan"}.`}
-            {stalled ? <span className="ml-1 text-warn">Still queued. Make sure the RQ worker is running (python -m app.worker in backend/).</span> : null}
+          <div className="flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm" role="status">
+            <span className="flex h-2 w-2 rounded-full bg-accent animate-pulse" />
+            <div>
+              <p className="font-medium text-ink">
+                {job?.status === "queued"
+                  ? `Your ${KIND[job.kind] ?? "assessment"} is scheduled for processing…`
+                  : `Generating your personalized ${KIND[job?.kind ?? ""] ?? "plan"}…`}
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                {stalled
+                  ? "Your request is taking a little longer than usual. Please stay on this page while we finish processing."
+                  : "Your assessment is being processed. This may take a few moments."}
+              </p>
+            </div>
           </div>
         ) : null}
         {jobFailed ? (
           <div className="rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-sm" role="alert">
-            <p className="font-medium text-bad">The last job failed.</p>
-            <p className="mt-1 text-muted">{job?.error || "No error detail was recorded."}</p>
+            <p className="font-medium text-bad">Something went wrong while generating your {KIND[job?.kind ?? ""] ?? "plan"}.</p>
+            <p className="mt-1 text-xs text-muted">Please try again to regenerate your assessment and roadmap.</p>
             <button className={`${btnPrimary} mt-3`} disabled={retrying} onClick={retry} type="button">
-              {retrying ? "Queueing…" : "Try again"}
+              {retrying ? "Processing…" : "Try again"}
             </button>
           </div>
         ) : null}
