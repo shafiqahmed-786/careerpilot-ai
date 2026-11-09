@@ -11,7 +11,6 @@ import json
 from pydantic import ValidationError
 
 from app import llm
-from app.config import settings
 from app.gaps import GapScore
 from app.schemas import Narrative, ResourceDraft
 

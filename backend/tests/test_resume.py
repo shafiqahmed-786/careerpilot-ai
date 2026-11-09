@@ -49,6 +49,17 @@ def test_extracts_docx_and_pdf() -> None:
         ("cv.pdf", "application/pdf", b"%PDF-1.4\n" + b"garbage " * 40, 422),
         ("cv.docx", DOCX, b"PK\x03\x04" + b"0" * 100, 422),
     ],
+    ids=[
+        "wrong-ext-txt",
+        "exe-header",
+        "pdf-wrong-mime",
+        "pdf-corrupt-header",
+        "docx-corrupt-zip",
+        "empty-pdf",
+        "oversized-pdf",
+        "pdf-garbage-body",
+        "docx-truncated-zip",
+    ],
 )
 def test_rejects_bad_uploads(name, ctype, data, status) -> None:
     with pytest.raises(ResumeError) as error:

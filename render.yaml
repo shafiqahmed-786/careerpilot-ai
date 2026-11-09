@@ -1,12 +1,11 @@
-# Render blueprint: API + separate RQ worker. Create PostgreSQL and Redis (Key Value) in Render
-# (or use external ones) and paste their internal URLs into DATABASE_URL / REDIS_URL.
+# Render blueprint: Single Web Service running FastAPI + RQ Worker via supervisor
 services:
   - type: web
     name: careerpilot-api
     runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt && alembic upgrade head
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt
+    startCommand: python supervise.py
     healthCheckPath: /api/v1/health
     envVars:
       - key: PYTHON_VERSION
@@ -21,31 +20,6 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false # e.g. https://your-app.vercel.app (comma-separated, no trailing slash)
-      - key: GROQ_API_KEY
-        sync: false
-      - key: GROQ_MODEL
-        value: openai/gpt-oss-120b
-      - key: GROQ_BASE_URL
-        value: https://api.groq.com/openai/v1
-      - key: TAVILY_API_KEY
-        sync: false
-  - type: worker
-    name: careerpilot-worker
-    runtime: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m app.worker
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.8
-      - key: APP_ENV
-        value: production
-      - key: JWT_SECRET
-        sync: false # must match the API service value
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
