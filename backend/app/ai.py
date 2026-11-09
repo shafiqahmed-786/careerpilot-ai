@@ -84,8 +84,8 @@ def enrich_narrative(
         data = llm.chat_json(
             [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
             temperature=0.2,
-            max_tokens=700,
-            timeout=45,
+            max_completion_tokens=2500,
+            timeout=60,
         )
         return Narrative.model_validate(data), "groq"
     except (llm.LLMError, ValidationError, ValueError):

@@ -253,7 +253,7 @@ def generate_roadmap(
         data = llm.chat_json(
             [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
             temperature=0.4,
-            max_tokens=3500,
+            max_completion_tokens=6000,
             timeout=90,
         )
         ai = AIRoadmap.model_validate(data)

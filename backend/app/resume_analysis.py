@@ -427,8 +427,8 @@ def llm_analysis(text: str, target_career: str | None) -> ResumeAnalysisResult:
     data = llm.chat_json(
         [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
         temperature=0.1,
-        max_tokens=2500,
-        timeout=75,
+        max_completion_tokens=6000,
+        timeout=90,
     )
     normalized = normalize_analysis_data(data)
     return ground_skills(ResumeAnalysisResult.model_validate(normalized), text)

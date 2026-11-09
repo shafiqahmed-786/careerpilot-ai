@@ -1,6 +1,14 @@
+import asyncio
 import os
+import sys
 import tempfile
 from pathlib import Path
+
+# Windows ProactorEventLoop deadlocks inside Starlette TestClient's AnyIO
+# blocking-portal when it calls _fallback_socketpair → socket.accept().
+# Switch to the Selector loop for tests.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _DIR = Path(tempfile.mkdtemp(prefix="careerpilot-test-"))
 _DB = _DIR / "test.db"
@@ -53,8 +61,8 @@ def migrated_database() -> None:
 
 @pytest.fixture
 def client() -> TestClient:
-    test_client = TestClient(app)
-    yield test_client
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 def auth(client: TestClient, email: str, password: str = "password123") -> str:
