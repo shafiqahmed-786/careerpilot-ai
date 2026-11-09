@@ -28,12 +28,16 @@ def available() -> bool:
     return bool(settings.groq_api_key)
 
 
-def _strip_markdown_fence(raw: str) -> str:
-    """Strip ```json ... ``` or ``` ... ``` if the model wraps JSON inside markdown code blocks."""
+def _extract_json_string(raw: str) -> str:
+    """Extract valid JSON from raw model output, handling fences and preamble/postamble text."""
     cleaned = raw.strip()
-    match = re.match(r"^```(?:json)?\s*([\s\S]*?)\s*```$", cleaned, re.IGNORECASE)
+    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned, re.IGNORECASE)
     if match:
-        return match.group(1).strip()
+        cleaned = match.group(1).strip()
+    first_brace = cleaned.find("{")
+    last_brace = cleaned.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        return cleaned[first_brace : last_brace + 1].strip()
     return cleaned
 
 
@@ -121,7 +125,7 @@ def chat(
 
 def chat_json(messages: list[dict], **kwargs) -> dict:
     content = chat(messages, json_mode=True, **kwargs)
-    cleaned = _strip_markdown_fence(content)
+    cleaned = _extract_json_string(content)
     try:
         data = json.loads(cleaned)
     except ValueError as exc:

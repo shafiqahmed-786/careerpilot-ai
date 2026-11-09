@@ -27,6 +27,17 @@ def enqueue_assessment(job_id: str) -> str:
     return job.id
 
 
+def enqueue_resume_analysis(job_id: str) -> str:
+    job = assessment_queue().enqueue(
+        "app.worker.process_resume_job",
+        job_id,
+        job_timeout=600,
+        result_ttl=500,
+        failure_ttl=86_400,
+    )
+    return job.id
+
+
 class _NoDeathPenalty:
     """RQ's default timeout uses SIGALRM, which Windows does not provide."""
 

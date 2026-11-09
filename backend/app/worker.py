@@ -10,6 +10,38 @@ from app.queue import QUEUE_NAME, redis_conn, worker_class
 from app.resume_analysis import analyze_text, compare_to_role
 
 
+def process_resume_job(job_id: str) -> None:
+    """Dedicated RQ entrypoint for resume analysis jobs."""
+    db = SessionLocal()
+    try:
+        job = db.get(AssessmentJob, job_id)
+        if job is None or job.status == "completed":
+            return
+        job.status = "running"
+        job.started_at = datetime.now(UTC)
+        job.error = None
+        db.commit()
+
+        run_resume_job(db, job)
+
+        job.status = "completed"
+        job.finished_at = datetime.now(UTC)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        job = db.get(AssessmentJob, job_id)
+        if job is not None and job.status != "completed":
+            job.status = "failed"
+            known = isinstance(exc, ValueError) and str(exc).startswith("The uploaded resume text")
+            job.error = str(exc) if known else "The resume analysis failed. Upload the file again."
+            _fail_resume(db, job, job.error)
+            job.finished_at = datetime.now(UTC)
+            db.commit()
+        raise
+    finally:
+        db.close()
+
+
 def process_assessment_job(job_id: str) -> None:
     db = SessionLocal()
     try:
@@ -69,6 +101,7 @@ def run_resume_job(db, job: AssessmentJob) -> None:
     resume.notice = notice
     resume.status = "completed"
     resume.source_text = None  # keep the structured analysis, drop the extracted text
+    db.commit()
 
 
 def _fail_resume(db, job: AssessmentJob, message: str) -> None:
@@ -77,6 +110,7 @@ def _fail_resume(db, job: AssessmentJob, message: str) -> None:
         resume.status = "failed"
         resume.error = message
         resume.source_text = None
+        db.commit()
 
 
 def main() -> None:

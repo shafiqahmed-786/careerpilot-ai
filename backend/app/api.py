@@ -10,7 +10,7 @@ from app.catalog import CATALOG, normalize_role, normalize_skill
 from app.config import settings
 from app.database import get_db
 from app.models import Assessment, AssessmentJob, Profile, ResumeAnalysis, Roadmap, RoadmapTask, User
-from app.queue import enqueue_assessment
+from app.queue import enqueue_assessment, enqueue_resume_analysis
 from app.schemas import (
     ActivityDay,
     AdaptRequest,
@@ -282,7 +282,10 @@ def create_and_enqueue(db: Session, user_id: str, kind: str, params: dict | None
     _commit(db)
     db.refresh(job)
     try:
-        job.rq_job_id = enqueue_assessment(job.id)
+        if kind == "resume":
+            job.rq_job_id = enqueue_resume_analysis(job.id)
+        else:
+            job.rq_job_id = enqueue_assessment(job.id)
         _commit(db)
     except Exception as exc:
         db.rollback()

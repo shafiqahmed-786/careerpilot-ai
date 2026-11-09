@@ -104,6 +104,15 @@ def latest_resume(user: User = Depends(get_current_user), db: Session = Depends(
     return _resume_out(row) if row else None
 
 
+@router.get("/{resume_id}", response_model=ResumeResponse)
+def get_resume(
+    resume_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ResumeResponse:
+    return _resume_out(_owned(db, user, resume_id))
+
+
 @router.delete("/{resume_id}", status_code=204)
 def delete_resume(resume_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
     db.delete(_owned(db, user, resume_id))

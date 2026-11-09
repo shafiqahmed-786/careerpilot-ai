@@ -42,7 +42,12 @@ export default function ResumeAnalyzerPage() {
       setPhase("processing");
       const done = await waitForJob(started.job.id);
       if (done.status === "failed") throw new Error(done.error || "The resume could not be analyzed");
-      await load();
+      try {
+        const specific = await api<ResumeResult>(`/api/v1/resume/${started.resume_id}`);
+        setResult(specific);
+      } catch {
+        await load();
+      }
     } catch (e) {
       setError(e instanceof ApiError || e instanceof Error ? e.message : "Upload failed");
       await load().catch(() => undefined);

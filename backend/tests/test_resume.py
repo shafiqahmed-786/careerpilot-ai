@@ -166,26 +166,101 @@ def test_resume_live_analysis_is_grounded(client: TestClient, monkeypatch) -> No
     monkeypatch.setattr(settings, "groq_api_key", "test-key")
     monkeypatch.setattr("app.llm.chat_json", fake_llm_json)
     token = auth(client, "resume-live@example.com")
-    assert _upload(client, token).status_code == 202
+    resp = _upload(client, token)
+    assert resp.status_code == 202
+    resume_id = resp.json()["resume_id"]
     run_worker(fake)
+
     latest = client.get("/api/v1/resume/latest", headers=bearer(token)).json()
+    assert latest["id"] == resume_id
+    assert latest["status"] == "completed"
     assert latest["provider"] == "groq" and latest["notice"] is None
     skills = {s["name"]: s for s in latest["analysis"]["skills"]}
     assert skills["Python"]["evidence_level"] == "demonstrated"
     assert skills["Kubernetes"]["evidence_level"] == "inferred"  # fabricated quote rejected
     assert latest["comparison"] is None  # no target career yet, so no role comparison
 
+    # Verify dedicated GET by resume_id endpoint returns identical persisted result
+    by_id = client.get(f"/api/v1/resume/{resume_id}", headers=bearer(token)).json()
+    assert by_id["id"] == resume_id
+    assert by_id["status"] == "completed"
+    assert by_id["provider"] == "groq"
+    assert by_id["analysis"] == latest["analysis"]
 
-def test_invalid_model_output_falls_back_and_apply_to_profile(client: TestClient, monkeypatch) -> None:
+
+def test_resume_and_assessment_job_dispatch_dedicated_processors(client: TestClient, monkeypatch) -> None:
+    """Regression test: resume uploads must enqueue process_resume_job, not process_assessment_job."""
+    fake = use_fake_redis(monkeypatch)
+    token = auth(client, "dispatch-test@example.com")
+    assert client.put("/api/v1/profile", json=PROFILE, headers=bearer(token)).status_code == 200
+
+    # 1. Resume analysis enqueue check
+    resume_resp = _upload(client, token)
+    assert resume_resp.status_code == 202
+    resume_rq_id = resume_resp.json()["job"]["id"]
+
+    from rq import Queue
+    q = Queue("careerpilot", connection=fake)
+    rq_resume_job = q.fetch_job(resume_resp.json()["job"].get("rq_job_id") or resume_rq_id)
+    assert rq_resume_job is not None
+    assert rq_resume_job.func_name == "app.worker.process_resume_job"
+    # The RQ job must target process_resume_job
+    all_jobs = q.get_jobs()
+    assert len(all_jobs) == 1
+    assert all_jobs[0].func_name == "app.worker.process_resume_job"
+
+    # 2. Assessment enqueue check
+    assessment_resp = client.post("/api/v1/assessments", headers=bearer(token))
+    assert assessment_resp.status_code == 202
+    all_jobs = q.get_jobs()
+    assert len(all_jobs) == 2
+    assessment_rq_job = next(j for j in all_jobs if j.func_name == "app.worker.process_assessment_job")
+    assert assessment_rq_job.func_name == "app.worker.process_assessment_job"
+
+
+def test_failed_resume_analysis_cannot_silently_appear_as_demo(client: TestClient, monkeypatch) -> None:
+    """Regression test: failed live resume analysis must fail cleanly and never silently produce a completed demo."""
     fake = use_fake_redis(monkeypatch)
     monkeypatch.setattr(settings, "groq_api_key", "test-key")
-    monkeypatch.setattr("app.llm.chat_json", lambda *a, **k: {"overview": "x"})
+
+    from app.llm import LLMError
+
+    def fail_llm(*args, **kwargs):
+        raise LLMError("Groq upstream connection failure")
+
+    monkeypatch.setattr("app.llm.chat_json", fail_llm)
+    token = auth(client, "resume-fail@example.com")
+    resp = _upload(client, token)
+    assert resp.status_code == 202
+    job_id = resp.json()["job"]["id"]
+    resume_id = resp.json()["resume_id"]
+
+    # Run worker: should handle failure gracefully, marking job and resume as failed
+    run_worker(fake)
+
+    # Job status must be failed
+    job = client.get(f"/api/v1/jobs/{job_id}", headers=bearer(token)).json()
+    assert job["status"] == "failed"
+
+    # Resume status must be failed, NOT completed as demo!
+    latest = client.get("/api/v1/resume/latest", headers=bearer(token)).json()
+    assert latest["status"] == "failed"
+    assert latest["provider"] != "demo"
+    assert "failed" in (latest["error"] or "").lower()
+
+    # And getting by ID returns failed status
+    by_id = client.get(f"/api/v1/resume/{resume_id}", headers=bearer(token)).json()
+    assert by_id["status"] == "failed"
+
+
+def test_apply_to_profile(client: TestClient, monkeypatch) -> None:
+    fake = use_fake_redis(monkeypatch)
     token = auth(client, "resume-apply@example.com")
     assert client.put("/api/v1/profile", json=PROFILE, headers=bearer(token)).status_code == 200
     resume_id = _upload(client, token).json()["resume_id"]
     run_worker(fake)
     latest = client.get("/api/v1/resume/latest", headers=bearer(token)).json()
-    assert latest["provider"] == "demo" and "keyword" in latest["notice"].lower()
+    assert latest["status"] == "completed"
 
     applied = client.post(f"/api/v1/resume/{resume_id}/apply-to-profile", headers=bearer(token))
     assert applied.status_code == 200, applied.text

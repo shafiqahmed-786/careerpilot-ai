@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import html
 import io
+import logging
 import re
 import zipfile
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
@@ -320,6 +321,106 @@ Rules:
 """
 
 
+logger = logging.getLogger("careerpilot.resume")
+
+
+def normalize_analysis_data(data: dict) -> dict:
+    """Sanitize and clamp model-generated JSON to ensure it satisfies ResumeAnalysisResult constraints."""
+    if not isinstance(data, dict):
+        data = {}
+
+    overview = str(data.get("overview") or "").strip()
+    if len(overview) < 10:
+        overview = "Resume analysis completed. Skills and experience were extracted from the document."
+    overview = overview[:900]
+
+    def _str_list(val, max_items: int, max_len: int = 240) -> list[str]:
+        if not isinstance(val, list):
+            return []
+        res = []
+        for x in val:
+            if x is not None:
+                s = str(x).strip()[:max_len]
+                if s:
+                    res.append(s)
+            if len(res) >= max_items:
+                break
+        return res
+
+    education = _str_list(data.get("education"), 6, 200)
+    experience = _str_list(data.get("experience"), 8, 240)
+    achievements = _str_list(data.get("achievements"), 8, 200)
+    strengths = _str_list(data.get("strengths"), 6, 200)
+    improvements = _str_list(data.get("improvements"), 6, 200)
+    potential_gaps = _str_list(data.get("potential_gaps"), 8, 200)
+    recommended_projects = _str_list(data.get("recommended_projects"), 5, 200)
+
+    raw_projects = data.get("projects")
+    projects = []
+    if isinstance(raw_projects, list):
+        for p in raw_projects[:8]:
+            if isinstance(p, dict):
+                p_name = str(p.get("name") or "Project")[:120].strip() or "Project"
+                p_summary = str(p.get("summary") or "")[:500].strip()
+                p_techs = _str_list(p.get("technologies"), 10, 60)
+                projects.append({"name": p_name, "summary": p_summary, "technologies": p_techs})
+
+    raw_skills = data.get("skills")
+    skills = []
+    if isinstance(raw_skills, list):
+        for s in raw_skills[:60]:
+            if not isinstance(s, dict):
+                continue
+            s_name = str(s.get("name") or "").strip()[:60]
+            if not s_name:
+                continue
+            s_category = str(s.get("category") or "Other").strip()[:40] or "Other"
+
+            level_raw = str(s.get("evidence_level") or "").strip().lower()
+            if "demonstrat" in level_raw:
+                s_level = "demonstrated"
+            elif "infer" in level_raw:
+                s_level = "inferred"
+            else:
+                s_level = "listed"
+
+            s_evidence = _str_list(s.get("evidence"), 2, 300)
+
+            conf_raw = str(s.get("confidence") or "").strip().lower()
+            if conf_raw in {"high", "medium", "low"}:
+                s_conf = conf_raw
+            elif "high" in conf_raw:
+                s_conf = "high"
+            elif "low" in conf_raw:
+                s_conf = "low"
+            else:
+                s_conf = "medium"
+
+            s_usage = str(s.get("usage") or "").strip()[:240]
+
+            skills.append({
+                "name": s_name,
+                "category": s_category,
+                "evidence_level": s_level,
+                "evidence": s_evidence,
+                "usage": s_usage,
+                "confidence": s_conf,
+            })
+
+    return {
+        "overview": overview,
+        "education": education,
+        "experience": experience,
+        "projects": projects,
+        "skills": skills,
+        "achievements": achievements,
+        "strengths": strengths,
+        "improvements": improvements,
+        "potential_gaps": potential_gaps,
+        "recommended_projects": recommended_projects,
+    }
+
+
 def llm_analysis(text: str, target_career: str | None) -> ResumeAnalysisResult:
     target = f"Target career: {target_career}\n" if target_career else ""
     user = f"{target}<resume>\n{text[:12000]}\n</resume>\nReturn the JSON analysis."
@@ -329,21 +430,19 @@ def llm_analysis(text: str, target_career: str | None) -> ResumeAnalysisResult:
         max_tokens=2500,
         timeout=75,
     )
-    return ground_skills(ResumeAnalysisResult.model_validate(data), text)
+    normalized = normalize_analysis_data(data)
+    return ground_skills(ResumeAnalysisResult.model_validate(normalized), text)
 
 
 def analyze_text(text: str, target_career: str | None) -> tuple[ResumeAnalysisResult, str, str | None]:
-    """Return (analysis, provider, notice). Falls back to keyword analysis, clearly labelled."""
+    """Return (analysis, provider, notice). Falls back to keyword analysis only when no LLM is configured."""
     if not llm.available():
         return heuristic_analysis(text), "demo", "No Groq key is configured, so keyword matching was used instead of an LLM."
     try:
         return llm_analysis(text, target_career), "groq", None
-    except (llm.LLMError, ValidationError, ValueError):
-        return (
-            heuristic_analysis(text),
-            "demo",
-            "The live analysis failed or returned invalid data, so keyword matching was used instead.",
-        )
+    except Exception as exc:
+        logger.error("Live Groq resume analysis failed: %s", exc)
+        raise
 
 
 # ---------------------------------------------------------------- deterministic comparison
