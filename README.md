@@ -502,6 +502,30 @@ The readiness endpoint is used to verify infrastructure dependencies rather than
 
 The background worker must remain operational for queued assessments, roadmap adaptation and resume analysis to complete.
 
+### Single-Service Render Free Deployment
+
+For zero-cost deployments on Render's Free tier, the backend container runs both the **FastAPI web server** and the **RQ background worker** concurrently inside a single container using a lightweight standard-library supervisor script (`backend/supervise.py` invoked via `backend/start.sh`).
+
+```mermaid
+flowchart TD
+  START["start.sh"] --> SUP["supervise.py"]
+  SUP --> MIG["Alembic upgrade head (runs once)"]
+  MIG --> WORKER["RQ Worker process<br/>(python -m app.worker)"]
+  MIG --> API["FastAPI / Uvicorn server<br/>(python -m uvicorn app.main:app)"]
+```
+
+**Startup & Process Supervision:**
+1. Runs database migrations (`alembic upgrade head`) once before services start.
+2. Spawns the RQ background worker to process assessment, roadmap adaptation, and resume analysis jobs.
+3. Spawns FastAPI/Uvicorn on `0.0.0.0:${PORT:-10000}` to serve HTTP traffic.
+4. Monitors both processes: if the worker exits unexpectedly, it is restarted with exponential backoff; if the API server exits or a shutdown signal (`SIGTERM`/`SIGINT`) is received, both processes are gracefully terminated.
+
+**Architecture Considerations & Free Tier Limitations:**
+- **Shared Resources**: The API server and background worker share the container's CPU and memory allocation (512 MB on Render Free).
+- **Inactivity Spin-Down**: Render Free web services spin down after 15 minutes of inactivity. Incoming HTTP requests spin the container back up.
+- **Job Interruptions**: Any job running at the moment of an instance restart or spin-down will be interrupted and marked as failed or retried on next startup.
+- **Use Case**: This single-container architecture is designed specifically for MVP demonstration and personal evaluation without incurring monthly fees. High-throughput production workloads should run dedicated worker instances.
+
 ### Local and production deployment
 
 The project supports local development through Docker Compose and the supplied setup scripts. Production deployment separates the frontend, API, worker and supporting infrastructure to allow independent scaling and configuration.
