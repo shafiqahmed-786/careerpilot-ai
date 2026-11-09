@@ -41,12 +41,36 @@ def _extract_json_string(raw: str) -> str:
     return cleaned
 
 
+def _extract_error_diagnostics(response: httpx.Response) -> tuple[str, str, str, str]:
+    """Safely extract error message, type, code, and failed_generation without exposing sensitive data."""
+    msg = ""
+    err_type = "none"
+    err_code = "none"
+    failed_gen = "none"
+    try:
+        data = response.json()
+        if isinstance(data, dict):
+            err = data.get("error")
+            if isinstance(err, dict):
+                msg = str(err.get("message") or "")[:200].strip()
+                err_type = str(err.get("type") or "none")[:50].strip()
+                err_code = str(err.get("code") or "none")[:50].strip()
+                if "failed_generation" in err and err["failed_generation"]:
+                    failed_gen = str(err["failed_generation"])[:200].strip()
+            elif isinstance(err, str):
+                msg = err[:200].strip()
+    except Exception:
+        msg = response.text[:200].strip()
+    return msg, err_type, err_code, failed_gen
+
+
 def chat(
     messages: list[dict],
     *,
     json_mode: bool = False,
     temperature: float = 0.3,
-    max_tokens: int = 1200,
+    max_completion_tokens: int | None = None,
+    max_tokens: int | None = None,
     timeout: float = 45.0,
     max_retries: int = 1,
 ) -> str:
@@ -54,12 +78,13 @@ def chat(
         logger.warning("LLM request skipped: Groq is not configured")
         raise LLMError("Groq is not configured")
 
+    tokens = max_completion_tokens or max_tokens or 4096
     logger.info("Executing LLM request provider=groq model=%s json_mode=%s", settings.groq_model, json_mode)
 
     payload: dict = {
         "model": settings.groq_model,
         "temperature": temperature,
-        "max_tokens": max_tokens,
+        "max_completion_tokens": tokens,
         "messages": messages,
     }
     if json_mode:
@@ -109,7 +134,18 @@ def chat(
             logger.warning("Groq request timed out provider=groq model=%s", settings.groq_model)
             raise LLMError("The Groq request timed out") from exc
         except httpx.HTTPStatusError as exc:
-            logger.warning("Groq HTTP error provider=groq model=%s status=%s", settings.groq_model, exc.response.status_code)
+            req_id = exc.response.headers.get("x-request-id", "unknown")
+            msg, err_type, err_code, failed_gen = _extract_error_diagnostics(exc.response)
+            logger.warning(
+                "Groq HTTP error provider=groq model=%s status=%s request_id=%s type=%s code=%s message=%s failed_generation=%s",
+                settings.groq_model,
+                exc.response.status_code,
+                req_id,
+                err_type,
+                err_code,
+                msg or "none",
+                failed_gen,
+            )
             raise LLMError(f"Groq returned HTTP {exc.response.status_code}") from exc
         except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
             last_exc = exc

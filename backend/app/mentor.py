@@ -244,7 +244,7 @@ def answer(db: Session, user: User, conversation: MentorConversation, content: s
         messages = [{"role": "system", "content": f"{SYSTEM}\n<user_context>\n{context_text(ctx)}\n</user_context>"}]
         messages += [{"role": m.role, "content": m.content} for m in history]
         try:
-            reply = llm.chat(messages, temperature=0.4, max_tokens=700, timeout=40).strip()
+            reply = llm.chat(messages, temperature=0.4, max_completion_tokens=2500, timeout=45).strip()
             provider = "groq"
         except llm.LLMError:
             notice = "The live AI request failed, so this is a template answer."
