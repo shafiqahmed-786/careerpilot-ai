@@ -163,6 +163,7 @@ class JobResponse(BaseModel):
     kind: str = "assessment"
     status: str
     error: str | None
+    rq_job_id: str | None = None
     assessment_id: str | None
     roadmap_id: str | None
     created_at: datetime

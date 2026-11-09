@@ -158,6 +158,7 @@ def _job_out(job: AssessmentJob) -> JobResponse:
         kind=job.kind or "assessment",
         status=job.status,
         error=job.error,
+        rq_job_id=job.rq_job_id,
         assessment_id=job.assessment_id,
         roadmap_id=job.roadmap_id,
         created_at=job.created_at,

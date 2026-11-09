@@ -87,6 +87,7 @@ export type Job = {
   kind: string;
   status: string;
   error: string | null;
+  rq_job_id?: string | null;
   assessment_id: string | null;
   roadmap_id: string | null;
   created_at: string;

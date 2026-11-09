@@ -189,33 +189,52 @@ def test_resume_live_analysis_is_grounded(client: TestClient, monkeypatch) -> No
 
 
 def test_resume_and_assessment_job_dispatch_dedicated_processors(client: TestClient, monkeypatch) -> None:
-    """Regression test: resume uploads must enqueue process_resume_job, not process_assessment_job."""
+    """Regression test: resume uploads must enqueue process_resume_job, and assessments must enqueue process_assessment_job."""
     fake = use_fake_redis(monkeypatch)
     token = auth(client, "dispatch-test@example.com")
     assert client.put("/api/v1/profile", json=PROFILE, headers=bearer(token)).status_code == 200
 
+    from rq import Queue
+    q = Queue("careerpilot", connection=fake)
+
     # 1. Resume analysis enqueue check
     resume_resp = _upload(client, token)
     assert resume_resp.status_code == 202
-    resume_rq_id = resume_resp.json()["job"]["id"]
+    resume_job_data = resume_resp.json()["job"]
+    resume_app_job_id = resume_job_data["id"]
+    resume_rq_id = resume_job_data.get("rq_job_id")
+    assert resume_rq_id is not None, "API response must expose the real RQ job ID in rq_job_id"
+    assert resume_rq_id != resume_app_job_id, "Application job ID and RQ job ID must be distinct"
 
-    from rq import Queue
-    q = Queue("careerpilot", connection=fake)
-    rq_resume_job = q.fetch_job(resume_resp.json()["job"].get("rq_job_id") or resume_rq_id)
-    assert rq_resume_job is not None
+    rq_resume_job = q.fetch_job(resume_rq_id)
+    assert rq_resume_job is not None, f"RQ job {resume_rq_id} not found in careerpilot queue"
     assert rq_resume_job.func_name == "app.worker.process_resume_job"
-    # The RQ job must target process_resume_job
+    assert rq_resume_job.args == (resume_app_job_id,)
+
     all_jobs = q.get_jobs()
     assert len(all_jobs) == 1
     assert all_jobs[0].func_name == "app.worker.process_resume_job"
+    assert all_jobs[0].args == (resume_app_job_id,)
 
     # 2. Assessment enqueue check
     assessment_resp = client.post("/api/v1/assessments", headers=bearer(token))
     assert assessment_resp.status_code == 202
+    assessment_job_data = assessment_resp.json()
+    assessment_app_job_id = assessment_job_data["id"]
+    assessment_rq_id = assessment_job_data.get("rq_job_id")
+    assert assessment_rq_id is not None, "API response must expose the real RQ job ID in rq_job_id"
+    assert assessment_rq_id != assessment_app_job_id, "Application job ID and RQ job ID must be distinct"
+
+    rq_assessment_job = q.fetch_job(assessment_rq_id)
+    assert rq_assessment_job is not None, f"RQ job {assessment_rq_id} not found in careerpilot queue"
+    assert rq_assessment_job.func_name == "app.worker.process_assessment_job"
+    assert rq_assessment_job.args == (assessment_app_job_id,)
+
     all_jobs = q.get_jobs()
     assert len(all_jobs) == 2
-    assessment_rq_job = next(j for j in all_jobs if j.func_name == "app.worker.process_assessment_job")
-    assert assessment_rq_job.func_name == "app.worker.process_assessment_job"
+    assessment_q_job = next(j for j in all_jobs if j.id == assessment_rq_id)
+    assert assessment_q_job.func_name == "app.worker.process_assessment_job"
+    assert assessment_q_job.args == (assessment_app_job_id,)
 
 
 def test_failed_resume_analysis_cannot_silently_appear_as_demo(client: TestClient, monkeypatch) -> None:
